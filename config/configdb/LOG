@@ -161,3 +161,80 @@
 17:08:07.496273 db@open done T·15.583ms
 17:08:07.496515 db@close closing
 17:08:07.496615 db@close done T·98µs
+=============== Aug 21, 2018 (CST) ===============
+17:16:45.749816 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:16:45.749971 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:16:45.749979 db@open opening
+17:16:45.750017 journal@recovery F·1
+17:16:45.752653 journal@recovery recovering @29
+17:16:45.753955 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:16:45.761328 db@janitor F·3 G·0
+17:16:45.761416 db@open done T·11.385287ms
+17:16:45.761494 db@close closing
+17:16:45.761679 db@close done T·184.806µs
+=============== Aug 21, 2018 (CST) ===============
+17:22:08.116478 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:22:08.116641 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:22:08.116650 db@open opening
+17:22:08.116691 journal@recovery F·1
+17:22:08.118384 journal@recovery recovering @31
+17:22:08.119483 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:22:08.132357 db@janitor F·3 G·0
+17:22:08.132411 db@open done T·15.748485ms
+17:22:08.132487 db@close closing
+17:22:08.132567 db@close done T·79.411µs
+=============== Aug 21, 2018 (CST) ===============
+17:27:02.558204 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:27:02.558401 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:27:02.558411 db@open opening
+17:27:02.558470 journal@recovery F·1
+17:27:02.560051 journal@recovery recovering @33
+17:27:02.561110 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:27:02.576739 db@janitor F·3 G·0
+17:27:02.576835 db@open done T·18.364197ms
+17:27:02.576926 db@close closing
+17:27:02.577013 db@close done T·77.206µs
+=============== Aug 21, 2018 (CST) ===============
+17:34:30.636432 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:34:30.636608 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:34:30.636615 db@open opening
+17:34:30.636651 journal@recovery F·1
+17:34:30.637996 journal@recovery recovering @35
+17:34:30.639299 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:34:30.652818 db@janitor F·3 G·0
+17:34:30.652934 db@open done T·16.242689ms
+17:34:30.653006 db@close closing
+17:34:30.653088 db@close done T·80.672µs
+=============== Aug 21, 2018 (CST) ===============
+17:38:47.915700 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:38:47.915888 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:38:47.915895 db@open opening
+17:38:47.915932 journal@recovery F·1
+17:38:47.917239 journal@recovery recovering @37
+17:38:47.918504 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:38:47.934454 db@janitor F·3 G·0
+17:38:47.934501 db@open done T·18.595614ms
+17:38:47.934570 db@close closing
+17:38:47.934732 db@close done T·150.534µs
+=============== Aug 21, 2018 (CST) ===============
+17:40:14.514356 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:40:14.514529 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:40:14.514536 db@open opening
+17:40:14.514573 journal@recovery F·1
+17:40:14.516471 journal@recovery recovering @39
+17:40:14.517351 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:40:14.538699 db@janitor F·3 G·0
+17:40:14.538813 db@open done T·24.213695ms
+17:40:14.538891 db@close closing
+17:40:14.538951 db@close done T·59.863µs
+=============== Aug 21, 2018 (CST) ===============
+17:42:15.261125 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+17:42:15.261294 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:42:15.261300 db@open opening
+17:42:15.261336 journal@recovery F·1
+17:42:15.263270 journal@recovery recovering @41
+17:42:15.264602 version@stat F·[1] S·324B[324B] Sc·[0.25]
+17:42:15.276106 db@janitor F·3 G·0
+17:42:15.276156 db@open done T·14.845887ms
+17:42:15.276232 db@close closing
+17:42:15.276352 db@close done T·119.434µs
