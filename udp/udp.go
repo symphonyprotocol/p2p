@@ -85,7 +85,7 @@ func (c *UDPService) loop() {
 func (c *UDPService) Dial(ip net.IP, port int, bytes []byte) {
 	c.mux.Lock()
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
-	//log.Printf("send udp data to %v\n", dstAddr)
+	log.Printf("send udp data to %v\n", dstAddr)
 	send := 0
 	for send < SEND_RETRY {
 		_, err := c.listener.WriteToUDP(bytes, dstAddr)
