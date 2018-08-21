@@ -148,9 +148,13 @@ func (c *UDPService) pingNodeLoop() {
 		nodes := c.option.KTable.PeekNodes()
 		fmt.Println(nodes)
 		for _, n := range nodes {
+            id, err := uuid.NewV4()
+            if err != nil {
+                log.Fatal(err)
+            }
 			diagram := PingDiagram{
 				UDPDiagram: UDPDiagram{
-					ID:             uuid.NewV4().String(),
+					ID:             id.String(),
 					Timestamp:      time.Now().Unix(),
 					DType:          UDP_DIAGRAM_PING,
 					Version:        1,
