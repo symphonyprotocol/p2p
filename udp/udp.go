@@ -3,6 +3,7 @@ package udp
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/satori/go.uuid"
 	"github.com/symphonyprotocol/p2p/kad"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/utils"
@@ -120,6 +121,7 @@ func (c *UDPService) handlePing(data []byte, remoteAddr *net.UDPAddr) {
 	log.Println(ping)
 	diagram := PongDiagram{
 		UDPDiagram: UDPDiagram{
+			ID:             ping.ID,
 			Timestamp:      time.Now().Unix(),
 			DType:          UDP_DIAGRAM_PONG,
 			Version:        1,
@@ -148,6 +150,7 @@ func (c *UDPService) pingNodeLoop() {
 		for _, n := range nodes {
 			diagram := PingDiagram{
 				UDPDiagram: UDPDiagram{
+					ID:             uuid.NewV4().String(),
 					Timestamp:      time.Now().Unix(),
 					DType:          UDP_DIAGRAM_PING,
 					Version:        1,

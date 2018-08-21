@@ -11,6 +11,7 @@ var (
 )
 
 type UDPDiagram struct {
+	ID             string
 	Timestamp      int64
 	DType          string
 	Version        int
