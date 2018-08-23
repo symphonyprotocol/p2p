@@ -24,6 +24,7 @@ type WaitReply struct {
 	WaitHandler WaitHandler
 	RemoteAddr  *net.UDPAddr
 	IsTimeout   bool
+	Retry       int
 }
 
 type WaitHandler func(wait WaitReply)
@@ -49,8 +50,17 @@ func NewUDPService(ip net.IP, port int) *UDPService {
 }
 
 func (c *UDPService) WaitHandler(wait WaitReply) {
-	log.Println("in waitHander")
-	log.Println(wait)
+	if wait.IsTimeout {
+		log.Printf("recieve %v with timeout", wait.MessageID)
+	} else {
+		log.Printf("recieve %v with data", wait.MessageID)
+	}
+	count := 0
+	c.waitList.Range(func(key, value interface{}) bool {
+		count += 1
+		return true
+	})
+	log.Printf("waitlist length: %v", count)
 }
 
 func (c *UDPService) addWaitReply(msgId string, nodeID string, expire int64) {
@@ -62,7 +72,6 @@ func (c *UDPService) addWaitReply(msgId string, nodeID string, expire int64) {
 		ExprieTs:    expire,
 		WaitHandler: WaitHandler(c.WaitHandler),
 	}
-	log.Println(wait)
 	c.waitList.Store(msgId, wait)
 }
 
@@ -86,7 +95,7 @@ func (c *UDPService) Ping(nodeID string, ip net.IP, port int) {
 	c.send(ip, port, utils.DiagramToBytes(ping))
 }
 
-func (c *UDPService) Pong(msgID string, nodeID string, ip net.IP, port int, remoteAddr *net.UDPAddr) {
+func (c *UDPService) Pong(msgID string, nodeID string, remoteAddr *net.UDPAddr) {
 	ts := time.Now().Unix()
 	expire := ts + int64(DEFAULT_TIMEOUT)
 	pong := PongDiagram{
@@ -103,7 +112,7 @@ func (c *UDPService) Pong(msgID string, nodeID string, ip net.IP, port int, remo
 		RemoteAddr: remoteAddr.IP.String(),
 		RemotePort: remoteAddr.Port,
 	}
-	c.send(ip, port, utils.DiagramToBytes(pong))
+	c.send(remoteAddr.IP, remoteAddr.Port, utils.DiagramToBytes(pong))
 }
 
 func (c *UDPService) loop() {
@@ -119,14 +128,25 @@ func (c *UDPService) loop() {
 		if err != nil {
 			fmt.Printf("error during read: %v", err)
 		}
-		log.Println(remoteAddr, data[:n])
+		//log.Println(remoteAddr, data[:n])
+		rdata := data[:n]
 		diagram := UDPDiagram{}
-		utils.BytesToUDPDiagram(data[:n], &diagram)
+		utils.BytesToUDPDiagram(rdata, &diagram)
 		if iwait, ok := c.waitList.Load(diagram.ID); ok {
 			wait := iwait.(WaitReply)
 			c.waitList.Delete(wait.MessageID)
 			wait.WaitHandler(wait)
 			wait.IsTimeout = false
+		} else {
+			now := time.Now().Unix()
+			if now-diagram.Timestamp > 0 {
+				continue
+			}
+			if diagram.DType == UDP_DIAGRAM_PING {
+				ping := PingDiagram{}
+				utils.BytesToUDPDiagram(rdata, &ping)
+				c.Pong(ping.ID, ping.NodeID, remoteAddr)
+			}
 		}
 	}
 }
@@ -169,10 +189,6 @@ func (c *UDPService) send(ip net.IP, port int, bytes []byte) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
 	log.Printf("send udp data to %v\n", dstAddr)
 	_, err := c.listener.WriteToUDP(bytes, dstAddr)
-	time.Sleep(100 * time.Millisecond)
-	_, err = c.listener.WriteToUDP(bytes, dstAddr)
-	time.Sleep(100 * time.Millisecond)
-	_, err = c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
 		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)
 	}
