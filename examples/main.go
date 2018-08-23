@@ -3,14 +3,11 @@ package main
 import (
 	"fmt"
 	//"github.com/symphonyprotocol/p2p/config"
-	"bytes"
-	"compress/gzip"
-	"encoding/base64"
-	"encoding/json"
 	"github.com/symphonyprotocol/p2p"
 	"github.com/symphonyprotocol/p2p/encrypt"
 	"github.com/symphonyprotocol/p2p/kad"
 	"github.com/symphonyprotocol/p2p/node"
+	"github.com/symphonyprotocol/p2p/utils"
 	//"github.com/symphonyprotocol/p2p/udp"
 	//"math/big"
 )
@@ -27,7 +24,7 @@ func getCurrentNode() *node.LocalNode {
 }
 
 func initialKtable() {
-	ktable := kad.NewKTable(getId())
+	ktable := kad.NewKTable(getId(), nil)
 	fmt.Println(ktable)
 }
 
@@ -60,24 +57,15 @@ func testJson() {
 		LocalAddr:  "192.168.0.1",
 		LocalPort:  12306,
 	}
-	data, _ := json.Marshal(diagram)
-	var b bytes.Buffer
-	gz := gzip.NewWriter(&b)
-	gz.Write([]byte(string(data)))
-	gz.Flush()
-	gz.Close()
-	fmt.Println(len(b.Bytes()), b.Bytes())
-	fmt.Println(len(data), data)
-	str := base64.StdEncoding.EncodeToString(b.Bytes())
-	fmt.Println(str)
-	fmt.Println(string(data))
-	bd := BaseDiagram{}
-	err := json.Unmarshal(data, &bd)
-	fmt.Println(err)
-	fmt.Println(bd)
+	data := utils.DiagramToBytes(diagram)
+	fmt.Println(data)
+	d := PingDiagram{}
+	utils.BytesToUDPDiagram(data, &d)
+	fmt.Println(d)
 }
 
 func main() {
 	fmt.Println("hello p2p")
 	initialServer()
+	//testJson()
 }

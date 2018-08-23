@@ -114,10 +114,12 @@ func NewKBucket() *KBucket {
 	}
 }
 
-func (b *KBucket) Add(remoteNode *node.RemoteNode) {
+func (b *KBucket) Add(remoteNode *node.RemoteNode) bool {
 	if b.nodes.Size() < BUCKETS_SIZE {
 		b.nodes.Add(remoteNode)
+		return true
 	}
+	return false
 }
 
 func (b *KBucket) Peek() *node.RemoteNode {
@@ -130,6 +132,10 @@ func (b *KBucket) Pop() *node.RemoteNode {
 
 func (b *KBucket) Search(nodeID string) *node.RemoteNode {
 	return b.nodes.Search(nodeID)
+}
+
+func (b *KBucket) Size() int {
+	return b.nodes.Size()
 }
 
 func (b *KBucket) MoveToTail(nodeID string) {

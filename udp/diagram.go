@@ -1,21 +1,20 @@
 package udp
 
-import (
-	"encoding/json"
-	"log"
-)
+import ()
 
 var (
-	UDP_DIAGRAM_PING = "PING"
-	UDP_DIAGRAM_PONG = "PONG"
+	DEFAULT_TIMEOUT     = 3
+	UDP_DIAGRAM_VERSION = 1
+	UDP_DIAGRAM_PING    = "PING"
+	UDP_DIAGRAM_PONG    = "PONG"
 )
 
 type UDPDiagram struct {
-	ID             string
-	Timestamp      int64
-	DType          string
-	Version        int
-	ExpireDuration int
+	ID        string
+	Timestamp int64
+	DType     string
+	Version   int
+	Expire    int64
 }
 
 type PingDiagram struct {
@@ -32,13 +31,4 @@ type PongDiagram struct {
 	LocalPort  int
 	RemoteAddr string
 	RemotePort int
-}
-
-func BytesToUDPDiagram(data []byte) UDPDiagram {
-	diagram := UDPDiagram{}
-	err := json.Unmarshal(data, &diagram)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return diagram
 }

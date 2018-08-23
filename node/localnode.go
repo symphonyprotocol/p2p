@@ -78,11 +78,14 @@ func NewLocalNode() *LocalNode {
 	localNode.Node.id = symen.PublicKeyToNodeId(privKey.PublicKey)
 	log.Printf("setup local node: %v", localNode.Node.id)
 	var ipStr string
-	ips, err := nat.IntranetIP()
-	if err != nil || len(ips) == 0 {
-		ipStr = "127.0.0.1"
-	} else {
-		ipStr = ips[0]
+	ipStr, err := nat.GetOutbountIP()
+	if err != nil {
+		ips, err := nat.IntranetIP()
+		if err != nil || len(ips) == 0 {
+			ipStr = "127.0.0.1"
+		} else {
+			ipStr = ips[0]
+		}
 	}
 	log.Printf("setup local node ip: %v", ipStr)
 	ip := net.ParseIP(ipStr)

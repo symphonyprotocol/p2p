@@ -1,11 +1,7 @@
 package udp
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/satori/go.uuid"
-	"github.com/symphonyprotocol/p2p/kad"
-	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/utils"
 	"log"
 	"net"
@@ -13,25 +9,33 @@ import (
 	"time"
 )
 
-var (
-	SEND_RETRY = 3
-)
-
-type UDPOption struct {
-	LocalNode *node.LocalNode
-	KTable    *kad.KTable
+type RecieveData struct {
+	RemoteAddr *net.UDPAddr
+	Data       []byte
 }
+
+type WaitReply struct {
+	MessageID   string
+	NodeID      string
+	IP          net.IP
+	Port        int
+	RecieveData RecieveData
+	ExprieTs    int64
+	WaitHandler WaitHandler
+	RemoteAddr  *net.UDPAddr
+	IsTimeout   bool
+}
+
+type WaitHandler func(wait WaitReply)
 
 type UDPService struct {
-	option     *UDPOption
-	listener   *net.UDPConn
-	port       int
-	ip         net.IP
-	mux        sync.Mutex
-	lastMsgMap map[string]int64
+	listener *net.UDPConn
+	port     int
+	ip       net.IP
+	waitList sync.Map
 }
 
-func NewUDPService(ip net.IP, port int, option *UDPOption) *UDPService {
+func NewUDPService(ip net.IP, port int) *UDPService {
 	client := &UDPService{
 		port: port,
 		ip:   ip,
@@ -41,9 +45,65 @@ func NewUDPService(ip net.IP, port int, option *UDPOption) *UDPService {
 		panic(err)
 	}
 	client.listener = listener
-	client.option = option
-	client.lastMsgMap = make(map[string]int64)
 	return client
+}
+
+func (c *UDPService) WaitHandler(wait WaitReply) {
+	log.Println("in waitHander")
+	log.Println(wait)
+}
+
+func (c *UDPService) addWaitReply(msgId string, nodeID string, expire int64) {
+	wait := WaitReply{
+		MessageID:   msgId,
+		NodeID:      nodeID,
+		IP:          c.ip,
+		Port:        c.port,
+		ExprieTs:    expire,
+		WaitHandler: WaitHandler(c.WaitHandler),
+	}
+	log.Println(wait)
+	c.waitList.Store(msgId, wait)
+}
+
+func (c *UDPService) Ping(nodeID string, ip net.IP, port int) {
+	id := utils.NewUUID()
+	ts := time.Now().Unix()
+	expire := ts + int64(DEFAULT_TIMEOUT)
+	ping := PingDiagram{
+		UDPDiagram: UDPDiagram{
+			ID:        id,
+			Timestamp: ts,
+			DType:     UDP_DIAGRAM_PING,
+			Version:   UDP_DIAGRAM_VERSION,
+			Expire:    expire,
+		},
+		NodeID:    nodeID,
+		LocalAddr: c.ip.String(),
+		LocalPort: c.port,
+	}
+	c.addWaitReply(ping.ID, nodeID, expire)
+	c.send(ip, port, utils.DiagramToBytes(ping))
+}
+
+func (c *UDPService) Pong(msgID string, nodeID string, ip net.IP, port int, remoteAddr *net.UDPAddr) {
+	ts := time.Now().Unix()
+	expire := ts + int64(DEFAULT_TIMEOUT)
+	pong := PongDiagram{
+		UDPDiagram: UDPDiagram{
+			ID:        msgID,
+			Timestamp: ts,
+			DType:     UDP_DIAGRAM_PONG,
+			Version:   UDP_DIAGRAM_VERSION,
+			Expire:    expire,
+		},
+		NodeID:     nodeID,
+		LocalAddr:  c.ip.String(),
+		LocalPort:  c.port,
+		RemoteAddr: remoteAddr.IP.String(),
+		RemotePort: remoteAddr.Port,
+	}
+	c.send(ip, port, utils.DiagramToBytes(pong))
 }
 
 func (c *UDPService) loop() {
@@ -59,116 +119,66 @@ func (c *UDPService) loop() {
 		if err != nil {
 			fmt.Printf("error during read: %v", err)
 		}
-		rdata := utils.UnzipDiagramBytes(data[:n])
-		diagram := BytesToUDPDiagram(rdata)
-		if ts, ok := c.lastMsgMap[diagram.DType]; ok {
-			if ts < diagram.Timestamp {
-				c.lastMsgMap[diagram.DType] = diagram.Timestamp
-			} else {
-				continue
-			}
-		} else {
-			c.lastMsgMap[diagram.DType] = diagram.Timestamp
-		}
-		if int(time.Now().Unix()-diagram.Timestamp) > diagram.ExpireDuration {
-			continue
-		}
-		switch diagram.DType {
-		case UDP_DIAGRAM_PING:
-			go c.handlePing(rdata, remoteAddr)
-		case UDP_DIAGRAM_PONG:
-			go c.handlerPong(rdata)
-		default:
+		log.Println(remoteAddr, data[:n])
+		diagram := UDPDiagram{}
+		utils.BytesToUDPDiagram(data[:n], &diagram)
+		if iwait, ok := c.waitList.Load(diagram.ID); ok {
+			wait := iwait.(WaitReply)
+			c.waitList.Delete(wait.MessageID)
+			wait.WaitHandler(wait)
+			wait.IsTimeout = false
 		}
 	}
 }
 
-func (c *UDPService) Dial(ip net.IP, port int, bytes []byte) {
-	c.mux.Lock()
+func (c *UDPService) loopTimeout() {
+	log.Println("start loop timeout...")
+	for {
+		var msgId string
+		var ts int64
+		c.waitList.Range(func(key, value interface{}) bool {
+			tmp := value.(WaitReply)
+			if ts < tmp.ExprieTs {
+				ts = tmp.ExprieTs
+				msgId = tmp.MessageID
+			}
+			return true
+		})
+		if ts == 0 {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		delta := ts - time.Now().Unix()
+		if delta > 0 {
+			log.Printf("wait %v for %v sec", msgId, delta)
+			timer := time.NewTimer(time.Second * time.Duration(delta))
+			<-timer.C
+		}
+
+		if iwait, ok := c.waitList.Load(msgId); ok {
+			log.Println("find timeout:" + msgId)
+			wait := iwait.(WaitReply)
+			c.waitList.Delete(msgId)
+			wait.IsTimeout = true
+			wait.WaitHandler(wait)
+		}
+	}
+}
+
+func (c *UDPService) send(ip net.IP, port int, bytes []byte) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
 	log.Printf("send udp data to %v\n", dstAddr)
-	send := 0
-	for send < SEND_RETRY {
-		_, err := c.listener.WriteToUDP(bytes, dstAddr)
-		if err != nil {
-			fmt.Printf("send UDP to target %v error:%v", dstAddr, err)
-		}
-		send++
+	_, err := c.listener.WriteToUDP(bytes, dstAddr)
+	time.Sleep(100 * time.Millisecond)
+	_, err = c.listener.WriteToUDP(bytes, dstAddr)
+	time.Sleep(100 * time.Millisecond)
+	_, err = c.listener.WriteToUDP(bytes, dstAddr)
+	if err != nil {
+		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)
 	}
-	c.mux.Unlock()
 }
 
 func (c *UDPService) Start() {
 	go c.loop()
-	go c.pingNodeLoop()
-}
-
-func (c *UDPService) handlerPong(data []byte) {
-	pong := PongDiagram{}
-	err := json.Unmarshal(data, &pong)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(pong)
-}
-
-func (c *UDPService) handlePing(data []byte, remoteAddr *net.UDPAddr) {
-	ping := PingDiagram{}
-	err := json.Unmarshal(data, &ping)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(ping)
-	diagram := PongDiagram{
-		UDPDiagram: UDPDiagram{
-			ID:             ping.ID,
-			Timestamp:      time.Now().Unix(),
-			DType:          UDP_DIAGRAM_PONG,
-			Version:        1,
-			ExpireDuration: 5,
-		},
-		NodeID:     c.option.LocalNode.GetID(),
-		LocalAddr:  c.option.LocalNode.GetIP().String(),
-		LocalPort:  c.option.LocalNode.GetUdpPort(),
-		RemoteAddr: remoteAddr.IP.String(),
-		RemotePort: remoteAddr.Port,
-	}
-	bytes := utils.ZipDiagramToBytes(diagram)
-	c.Dial(remoteAddr.IP, remoteAddr.Port, bytes)
-}
-
-func (c *UDPService) pingNodeLoop() {
-	for {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Printf("ping node err:%v", err)
-			}
-		}()
-		time.Sleep(5 * time.Second)
-		nodes := c.option.KTable.PeekNodes()
-		fmt.Println(nodes)
-		for _, n := range nodes {
-            id, err := uuid.NewV4()
-            if err != nil {
-                log.Fatal(err)
-            }
-			diagram := PingDiagram{
-				UDPDiagram: UDPDiagram{
-					ID:             id.String(),
-					Timestamp:      time.Now().Unix(),
-					DType:          UDP_DIAGRAM_PING,
-					Version:        1,
-					ExpireDuration: 5,
-				},
-				NodeID:    c.option.LocalNode.GetID(),
-				LocalAddr: c.option.LocalNode.GetIP().String(),
-				LocalPort: c.option.LocalNode.GetUdpPort(),
-			}
-			bytes := utils.ZipDiagramToBytes(diagram)
-			c.Dial(n.GetIP(), n.GetUdpPort(), bytes)
-		}
-	}
-}
-
-func (c *UDPService) disvoerNodes() {
+	go c.loopTimeout()
 }
