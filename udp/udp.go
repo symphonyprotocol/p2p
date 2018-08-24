@@ -154,27 +154,25 @@ func (c *UDPService) loop() {
 		if err != nil {
 			fmt.Printf("error during read: %v", err)
 		}
-		//log.Println(remoteAddr, data[:n])
+		log.Println(remoteAddr)
 		rdata := data[:n]
 		diagram := UDPDiagram{}
 		utils.BytesToUDPDiagram(rdata, &diagram)
 		if iwait, ok := c.waitList.Load(diagram.ID); ok {
+            log.Println("recieve callback")
 			wait := iwait.(waitReply)
 			c.waitList.Delete(wait.MessageID)
 			wait.WaitHandler(wait)
 			wait.IsTimeout = false
 		} else {
-			now := time.Now().Unix()
-			if now-diagram.Timestamp > 0 {
-				continue
-			}
-			if c.refresh != nil {
-				c.refresh(diagram.NodeID, remoteAddr.IP.String(), remoteAddr.Port)
-			}
+            log.Println("recieve new request")
 			if diagram.DType == UDP_DIAGRAM_PING {
 				ping := PingDiagram{}
 				utils.BytesToUDPDiagram(rdata, &ping)
 				c.Pong(ping.ID, ping.NodeID, remoteAddr)
+			}
+			if c.refresh != nil {
+				c.refresh(diagram.NodeID, remoteAddr.IP.String(), remoteAddr.Port)
 			}
 		}
 	}
