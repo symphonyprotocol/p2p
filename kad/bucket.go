@@ -1,163 +1,97 @@
 package kad
 
 import (
+	"sync"
+
 	"github.com/symphonyprotocol/p2p/node"
 )
 
-type BucketNode struct {
-	prev *BucketNode
-	node *node.RemoteNode
-	next *BucketNode
-}
-
-func (b *BucketNode) Prev() *BucketNode {
-	return b.prev
-}
-
-func (b *BucketNode) Node() *node.RemoteNode {
-	return b.node
-}
-
-func (b *BucketNode) Next() *BucketNode {
-	return b.next
-}
-
-type BucketQueue struct {
-	head *BucketNode
-	tail *BucketNode
-	size int
-}
-
-func (q *BucketQueue) Size() int {
-	return q.size
-}
-
-func (q *BucketQueue) Tail() *BucketNode {
-	return q.tail
-}
-
-func (q *BucketQueue) Head() *BucketNode {
-	return q.head
-}
-
-func (q *BucketQueue) Peek() *node.RemoteNode {
-	if q.head == nil {
-		return nil
-	}
-	return q.head.node
-}
-
-func (q *BucketQueue) SearchNode(nodeID string) *BucketNode {
-	if q.size == 0 {
-		return nil
-	}
-	bnode := q.head
-	for {
-		if bnode.node.GetID() == nodeID {
-			return bnode
-		}
-	}
-	return nil
-}
-
-func (q *BucketQueue) Add(remoteNode *node.RemoteNode) {
-	bnode := &BucketNode{
-		prev: q.tail,
-		node: remoteNode,
-		next: nil,
-	}
-	if q.tail == nil {
-		q.head = bnode
-		q.tail = bnode
-	} else {
-		q.tail.next = bnode
-		q.tail = bnode
-	}
-	q.size++
-	bnode = nil
-}
-
-func (q *BucketQueue) Pop() *node.RemoteNode {
-	if q.head == nil {
-		return nil
-	}
-	firstNode := q.head
-	q.head = firstNode.next
-	q.size--
-	return firstNode.node
-}
-
-func (q *BucketQueue) Search(nodeID string) *node.RemoteNode {
-	if q.tail == nil {
-		return nil
-	}
-	tmpNode := q.head
-	for {
-		if tmpNode == nil {
-			break
-		}
-		if nodeID == tmpNode.node.GetID() {
-			return tmpNode.node
-		}
-		tmpNode = tmpNode.next
-	}
-	return nil
-}
-
 type KBucket struct {
-	nodes *BucketQueue
+	mux   sync.RWMutex
+	nodes []*node.RemoteNode
 }
 
 func NewKBucket() *KBucket {
 	return &KBucket{
-		nodes: &BucketQueue{},
+		nodes: make([]*node.RemoteNode, 0),
 	}
 }
 
 func (b *KBucket) Add(remoteNode *node.RemoteNode) bool {
-	if b.nodes.Size() < BUCKETS_SIZE {
-		b.nodes.Add(remoteNode)
+	b.mux.Lock()
+	defer b.mux.Unlock()
+	if len(b.nodes) < BUCKETS_SIZE {
+		b.nodes = append(b.nodes, remoteNode)
 		return true
 	}
 	return false
 }
 
 func (b *KBucket) Peek() *node.RemoteNode {
-	return b.nodes.Peek()
-}
-
-func (b *KBucket) Pop() *node.RemoteNode {
-	return b.nodes.Pop()
+	b.mux.RLock()
+	defer b.mux.RUnlock()
+	if len(b.nodes) == 0 {
+		return nil
+	}
+	return b.nodes[0]
 }
 
 func (b *KBucket) Search(nodeID string) *node.RemoteNode {
-	return b.nodes.Search(nodeID)
+	b.mux.RLock()
+	defer b.mux.RUnlock()
+	for _, rnode := range b.nodes {
+		if rnode.GetID() == nodeID {
+			return rnode
+		}
+	}
+	return nil
 }
 
 func (b *KBucket) Size() int {
-	return b.nodes.Size()
+	return len(b.nodes)
 }
 
-func (b *KBucket) MoveToTail(nodeID string) {
-	if b.nodes.Size() <= 1 {
+func (b *KBucket) Remove(remoteNode *node.RemoteNode) {
+	b.mux.Lock()
+	defer b.mux.Unlock()
+	if len(b.nodes) == 0 {
 		return
-	}
-	bnode := b.nodes.SearchNode(nodeID)
-	if bnode == b.nodes.tail {
-		return
-	}
-	if bnode == b.nodes.head {
-		remote := b.Pop()
-		b.Add(remote)
+	} else if len(b.nodes) == 1 {
+		b.nodes = make([]*node.RemoteNode, 0)
 	} else {
-		prev := bnode.prev
-		next := bnode.next
-		prev.next = next
-		next.prev = prev
-		tail := b.nodes.tail
-		tail.next = bnode
-		bnode.prev = tail
-		bnode.next = nil
-		b.nodes.tail = bnode
+		var idx = -1
+		for id, rnode := range b.nodes {
+			if rnode == remoteNode {
+				idx = id
+				break
+			}
+		}
+		if idx == -1 {
+			return
+		}
+		if idx+1 == len(b.nodes) {
+			b.nodes = b.nodes[:idx]
+		} else {
+			b.nodes = append(b.nodes[:idx], b.nodes[idx+1:]...)
+		}
 	}
+}
+
+func (b *KBucket) MoveToTail(remoteNode *node.RemoteNode) {
+	b.mux.Lock()
+	b.mux.Unlock()
+	if len(b.nodes) <= 1 {
+		return
+	}
+	rIndex := -1
+	for i := 0; i < len(b.nodes); i++ {
+		if b.nodes[i] == remoteNode {
+			rIndex = i
+			break
+		}
+	}
+	if len(b.nodes) == (rIndex + 1) {
+		return
+	}
+	b.nodes = append(b.nodes[rIndex+1:], remoteNode)
 }

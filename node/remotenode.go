@@ -3,8 +3,9 @@ package node
 import (
 	//"crypto/ecdsa"
 	"encoding/hex"
-	symen "github.com/symphonyprotocol/p2p/encrypt"
 	"net"
+
+	symen "github.com/symphonyprotocol/p2p/encrypt"
 )
 
 type RemoteNode struct {
@@ -24,27 +25,27 @@ func (r *RemoteNode) GetIP() net.IP {
 	return r.ip
 }
 
-func (r *RemoteNode) GetUdpPort() int {
-	return r.uport
-}
-
-func (r *RemoteNode) GetTcpPort() int {
-	return r.tport
+func (r *RemoteNode) GetPort() int {
+	return r.port
 }
 
 func (r *RemoteNode) GetIDBytes() []byte {
 	return r.id
 }
 
+func (r *RemoteNode) RefreshNode(ip string, port int) {
+	r.ip = net.ParseIP(ip)
+	r.port = port
+}
+
 func (r *RemoteNode) SetPublicKey(keyStr string) {
 	r.pubKey = symen.ToPublicKey(keyStr)
 }
 
-func NewRemoteNode(id []byte, ip net.IP, uport int, tport int) *RemoteNode {
+func NewRemoteNode(id []byte, ip net.IP, port int) *RemoteNode {
 	remote := &RemoteNode{}
 	remote.Node.id = id
-	remote.Node.uport = uport
-	remote.Node.tport = tport
+	remote.Node.port = port
 	remote.Node.ip = ip
 	remote.Distance = -1
 	return remote

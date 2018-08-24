@@ -12,8 +12,7 @@ var (
 			{
 				"id": "047de44480ff166ee6c8a325f8d2a1bbb12d056159cd4f871c92f8464efe9f564baad09334aba0f83f7b805400ed85af7b54e59c3cce111dfbce5e36928e73c9f3",
 				"ip":"47.88.227.223",
-				"uport": 32768,
-				"tport": 32768
+				"port": 32768
 			}
 		]
 	}`)
@@ -29,8 +28,7 @@ type StaticNodes struct {
 type StaticNode struct {
 	ID        string `json:"id"`
 	IP        string `json:"ip"`
-	UPort     int    `json:"uport"`
-	TPort     int    `json:"tport"`
+	Port      int    `json:"port"`
 	PublicKey string `json:"publickey"`
 }
 

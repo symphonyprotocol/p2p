@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+
 	"github.com/symphonyprotocol/p2p/kad"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/udp"
@@ -16,8 +17,8 @@ type P2PServer struct {
 
 func NewP2PServer() *P2PServer {
 	node := node.NewLocalNode()
-	udpService := udp.NewUDPService(node.GetIP(), node.GetUdpPort())
-	ktable := kad.NewKTable(node.GetIDBytes(), udpService)
+	udpService := udp.NewUDPService(node.GetIP(), node.GetPort())
+	ktable := kad.NewKTable(node, udpService)
 	srv := &P2PServer{
 		node:       node,
 		ktable:     ktable,

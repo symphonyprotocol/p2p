@@ -3,13 +3,14 @@ package node
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"log"
+	"net"
+
 	"github.com/symphonyprotocol/nat"
 	"github.com/symphonyprotocol/nat/upnp"
 	"github.com/symphonyprotocol/p2p/config"
 	symen "github.com/symphonyprotocol/p2p/encrypt"
 	"github.com/symphonyprotocol/p2p/node/store"
-	"log"
-	"net"
 )
 
 type Interface interface {
@@ -17,15 +18,15 @@ type Interface interface {
 	GetID() string
 	GetPublicKey() string
 	GetIP() net.IP
-	GetUdpPort() int
-	GetTcpPort() int
+	GetPort() int
+	RefreshNode(ip string, port int)
 }
 
 type Node struct {
-	id           []byte
-	ip           net.IP
-	uport, tport int
-	pubKey       ecdsa.PublicKey
+	id     []byte
+	ip     net.IP
+	port   int
+	pubKey ecdsa.PublicKey
 }
 
 type LocalNode struct {
@@ -52,12 +53,13 @@ func (n *LocalNode) GetIP() net.IP {
 	return n.ip
 }
 
-func (n *LocalNode) GetUdpPort() int {
-	return n.uport
+func (n *LocalNode) GetPort() int {
+	return n.port
 }
 
-func (n *LocalNode) GetTcpPort() int {
-	return n.tport
+func (n *LocalNode) RefreshNode(ip string, port int) {
+	n.ip = net.ParseIP(ip)
+	n.port = port
 }
 
 func NewLocalNode() *LocalNode {
@@ -76,7 +78,7 @@ func NewLocalNode() *LocalNode {
 	}
 	localNode := &LocalNode{}
 	localNode.Node.id = symen.PublicKeyToNodeId(privKey.PublicKey)
-	log.Printf("setup local node: %v", localNode.Node.id)
+	log.Printf("setup local node: %v", localNode.GetID())
 	var ipStr string
 	ipStr, err := nat.GetOutbountIP()
 	if err != nil {
@@ -90,8 +92,7 @@ func NewLocalNode() *LocalNode {
 	log.Printf("setup local node ip: %v", ipStr)
 	ip := net.ParseIP(ipStr)
 	localNode.Node.ip = ip
-	localNode.Node.uport = config.DEFAULT_UDP_PORT
-	localNode.Node.tport = config.DEFAULT_TCP_PORT
+	localNode.Node.port = config.DEFAULT_UDP_PORT
 	localNode.pubKey = privKey.PublicKey
 	log.Printf("setup local node pubkey: %v", pubKeyStr)
 	localNode.privKey = privKey

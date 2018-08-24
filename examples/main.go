@@ -24,7 +24,7 @@ func getCurrentNode() *node.LocalNode {
 }
 
 func initialKtable() {
-	ktable := kad.NewKTable(getId(), nil)
+	ktable := kad.NewKTable(getCurrentNode(), nil)
 	fmt.Println(ktable)
 }
 

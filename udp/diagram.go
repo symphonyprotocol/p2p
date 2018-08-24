@@ -1,7 +1,5 @@
 package udp
 
-import ()
-
 var (
 	DEFAULT_TIMEOUT     = 3
 	UDP_DIAGRAM_VERSION = 1
@@ -11,6 +9,7 @@ var (
 
 type UDPDiagram struct {
 	ID        string
+	NodeID    string
 	Timestamp int64
 	DType     string
 	Version   int
@@ -19,14 +18,12 @@ type UDPDiagram struct {
 
 type PingDiagram struct {
 	UDPDiagram
-	NodeID    string
 	LocalAddr string
 	LocalPort int
 }
 
 type PongDiagram struct {
 	UDPDiagram
-	NodeID     string
 	LocalAddr  string
 	LocalPort  int
 	RemoteAddr string
