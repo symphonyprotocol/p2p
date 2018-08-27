@@ -138,7 +138,7 @@ func (t *KTable) pingPong(rnode *node.RemoteNode) bool {
 }
 
 func (t *KTable) ping(rnode *node.RemoteNode) {
-	t.network.Ping(t.localNode.GetID(), rnode.GetIP(), rnode.GetPort(), nil)
+	t.network.Ping(rnode.GetID(), rnode.GetIP(), rnode.GetPort(), nil)
 }
 
 func (t *KTable) Start() {

@@ -20,34 +20,37 @@ type recieveData struct {
 }
 
 type waitReply struct {
-	MessageID   string
-	NodeID      string
-	IP          net.IP
-	Port        int
-	RecieveData recieveData
-	ExprieTs    int64
-	WaitHandler waitHandler
-	RemoteAddr  *net.UDPAddr
-	IsTimeout   bool
-	Retry       int
-	WaitChan    chan bool
+	MessageID    string
+	LocalNodeID  string
+	RemoteNodeID string
+	IP           net.IP
+	Port         int
+	RecieveData  recieveData
+	ExprieTs     int64
+	WaitHandler  waitHandler
+	RemoteAddr   *net.UDPAddr
+	IsTimeout    bool
+	Retry        int
+	WaitChan     chan bool
 }
 
 type waitHandler func(wait waitReply)
 
 type UDPService struct {
-	listener *net.UDPConn
-	port     int
-	ip       net.IP
-	waitList sync.Map
-	refresh  func(string, string, int)
-	offline  func(string)
+	listener    *net.UDPConn
+	localNodeID string
+	port        int
+	ip          net.IP
+	waitList    sync.Map
+	refresh     func(string, string, int)
+	offline     func(string)
 }
 
-func NewUDPService(ip net.IP, port int) *UDPService {
+func NewUDPService(localNodeID string, ip net.IP, port int) *UDPService {
 	client := &UDPService{
-		port: port,
-		ip:   ip,
+		localNodeID: localNodeID,
+		port:        port,
+		ip:          ip,
 	}
 	listener, err := net.ListenUDP("udp", &net.UDPAddr{IP: ip, Port: port})
 	if err != nil {
@@ -63,11 +66,11 @@ func (c *UDPService) waitHandler(wait waitReply) {
 	}
 	if wait.IsTimeout {
 		if c.offline != nil {
-			c.offline(wait.NodeID)
+			c.offline(wait.RemoteNodeID)
 		}
 	} else {
 		if c.refresh != nil {
-			c.refresh(wait.NodeID, wait.IP.String(), wait.Port)
+			c.refresh(wait.RemoteNodeID, wait.IP.String(), wait.Port)
 		}
 	}
 	count := 0
@@ -78,15 +81,16 @@ func (c *UDPService) waitHandler(wait waitReply) {
 	log.Printf("waitlist length: %v", count)
 }
 
-func (c *UDPService) addWaitReply(msgID string, nodeID string, ip net.IP, port int, expire int64, waitChan chan bool) {
+func (c *UDPService) addWaitReply(msgID string, remoteNodeID string, ip net.IP, port int, expire int64, waitChan chan bool) {
 	wait := waitReply{
-		MessageID:   msgID,
-		NodeID:      nodeID,
-		IP:          ip,
-		Port:        port,
-		ExprieTs:    expire,
-		WaitHandler: waitHandler(c.waitHandler),
-		WaitChan:    waitChan,
+		MessageID:    msgID,
+		LocalNodeID:  c.localNodeID,
+		RemoteNodeID: remoteNodeID,
+		IP:           ip,
+		Port:         port,
+		ExprieTs:     expire,
+		WaitHandler:  waitHandler(c.waitHandler),
+		WaitChan:     waitChan,
 	}
 	c.waitList.Store(msgID, wait)
 }
@@ -99,14 +103,14 @@ func (c *UDPService) RegisterOffline(f func(string)) {
 	c.offline = f
 }
 
-func (c *UDPService) Ping(nodeID string, ip net.IP, port int, waitChan chan bool) {
+func (c *UDPService) Ping(remoteNodeID string, ip net.IP, port int, waitChan chan bool) {
 	id := utils.NewUUID()
 	ts := time.Now().Unix()
 	expire := ts + int64(DEFAULT_TIMEOUT)
 	ping := PingDiagram{
 		UDPDiagram: UDPDiagram{
 			ID:        id,
-			NodeID:    nodeID,
+			NodeID:    c.localNodeID,
 			Timestamp: ts,
 			DType:     UDP_DIAGRAM_PING,
 			Version:   UDP_DIAGRAM_VERSION,
@@ -116,17 +120,17 @@ func (c *UDPService) Ping(nodeID string, ip net.IP, port int, waitChan chan bool
 		LocalPort: c.port,
 	}
 	log.Printf("ping %v:%v with msg id:%v\n", ip, port, id)
-	c.addWaitReply(ping.ID, nodeID, ip, port, expire, waitChan)
+	c.addWaitReply(ping.ID, remoteNodeID, ip, port, expire, waitChan)
 	c.send(ip, port, utils.DiagramToBytes(ping))
 }
 
-func (c *UDPService) Pong(msgID string, nodeID string, remoteAddr *net.UDPAddr) {
+func (c *UDPService) Pong(msgID string, remoteAddr *net.UDPAddr) {
 	ts := time.Now().Unix()
 	expire := ts + int64(DEFAULT_TIMEOUT)
 	pong := PongDiagram{
 		UDPDiagram: UDPDiagram{
 			ID:        msgID,
-			NodeID:    nodeID,
+			NodeID:    c.localNodeID,
 			Timestamp: ts,
 			DType:     UDP_DIAGRAM_PONG,
 			Version:   UDP_DIAGRAM_VERSION,
@@ -168,7 +172,7 @@ func (c *UDPService) loop() {
 			if diagram.DType == UDP_DIAGRAM_PING {
 				ping := PingDiagram{}
 				utils.BytesToUDPDiagram(rdata, &ping)
-				c.Pong(ping.ID, ping.NodeID, remoteAddr)
+				c.Pong(ping.ID, remoteAddr)
 			}
 			if c.refresh != nil {
 				c.refresh(diagram.NodeID, remoteAddr.IP.String(), remoteAddr.Port)
