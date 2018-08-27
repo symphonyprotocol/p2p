@@ -86,7 +86,7 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 
 func (t *KTable) offline(nodeID string) {
 	t.mux.Lock()
-	log.Println("offline trigger")
+	log.Printf("node offline %v\n", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -100,28 +100,24 @@ func (t *KTable) offline(nodeID string) {
 
 func (t *KTable) refresh(nodeID string, ip string, port int) {
 	t.mux.Lock()
-	log.Println("refresh trigger")
+	log.Printf("node refresh %v\n", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
+			log.Println("refresh exist node")
 			rnode.RefreshNode(ip, port)
 			bucket.MoveToTail(rnode)
 		} else {
+			log.Println("refresh to add new node")
 			ipAddr := net.ParseIP(ip)
 			rnode = node.NewRemoteNode(id, ipAddr, port)
 			if bucket.Add(rnode) {
 				return
 			}
-			//todo: ping first then decide to add
-			headNode := bucket.Peek()
-			if t.pingPong(headNode) {
-				bucket.MoveToTail(headNode)
-			} else {
-				bucket.Remove(headNode)
-				bucket.Add(rnode)
-			}
+			log.Println("refresh to ping first node")
+			//todo: ping first then decide to add, ignore this action
 		}
 	} else {
 		ipAddr := net.ParseIP(ip)

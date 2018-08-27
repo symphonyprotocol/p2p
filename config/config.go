@@ -10,7 +10,7 @@ var (
 		"nodes":
 		[
 			{
-				"id": "047de44480ff166ee6c8a325f8d2a1bbb12d056159cd4f871c92f8464efe9f564baad09334aba0f83f7b805400ed85af7b54e59c3cce111dfbce5e36928e73c9f3",
+				"id": "6695a9ee2972376eb9d3e7c6a4925aef6b1a4edfc5b9f496c79d11f02ca4901e",
 				"ip":"47.88.227.223",
 				"port": 32768
 			}

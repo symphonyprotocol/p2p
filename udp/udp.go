@@ -62,12 +62,10 @@ func (c *UDPService) waitHandler(wait waitReply) {
 		wait.WaitChan <- !wait.IsTimeout
 	}
 	if wait.IsTimeout {
-		log.Printf("recieve %v with timeout", wait.MessageID)
 		if c.offline != nil {
 			c.offline(wait.NodeID)
 		}
 	} else {
-		log.Printf("recieve %v with data", wait.MessageID)
 		if c.refresh != nil {
 			c.refresh(wait.NodeID, wait.IP.String(), wait.Port)
 		}
@@ -117,6 +115,7 @@ func (c *UDPService) Ping(nodeID string, ip net.IP, port int, waitChan chan bool
 		LocalAddr: c.ip.String(),
 		LocalPort: c.port,
 	}
+	log.Printf("ping %v:%v with msg id:%v\n", ip, port, id)
 	c.addWaitReply(ping.ID, nodeID, ip, port, expire, waitChan)
 	c.send(ip, port, utils.DiagramToBytes(ping))
 }
@@ -138,6 +137,7 @@ func (c *UDPService) Pong(msgID string, nodeID string, remoteAddr *net.UDPAddr) 
 		RemoteAddr: remoteAddr.IP.String(),
 		RemotePort: remoteAddr.Port,
 	}
+	log.Printf("pong %v:%v with msg id:%v\n", remoteAddr.IP.String(), remoteAddr.Port, msgID)
 	c.send(remoteAddr.IP, remoteAddr.Port, utils.DiagramToBytes(pong))
 }
 
@@ -154,18 +154,17 @@ func (c *UDPService) loop() {
 		if err != nil {
 			fmt.Printf("error during read: %v", err)
 		}
-		log.Println(remoteAddr)
 		rdata := data[:n]
 		diagram := UDPDiagram{}
 		utils.BytesToUDPDiagram(rdata, &diagram)
 		if iwait, ok := c.waitList.Load(diagram.ID); ok {
-            log.Println("recieve callback")
+			log.Println("recieve callback")
 			wait := iwait.(waitReply)
 			c.waitList.Delete(wait.MessageID)
 			wait.WaitHandler(wait)
 			wait.IsTimeout = false
 		} else {
-            log.Println("recieve new request")
+			log.Println("recieve new request")
 			if diagram.DType == UDP_DIAGRAM_PING {
 				ping := PingDiagram{}
 				utils.BytesToUDPDiagram(rdata, &ping)
@@ -197,7 +196,7 @@ func (c *UDPService) loopTimeout() {
 		}
 		delta := ts - time.Now().Unix()
 		if delta > 0 {
-			log.Printf("wait %v for %v sec", msgID, delta)
+			//log.Printf("wait %v for %v sec", msgID, delta)
 			timer := time.NewTimer(time.Second * time.Duration(delta))
 			<-timer.C
 		}
@@ -214,7 +213,7 @@ func (c *UDPService) loopTimeout() {
 
 func (c *UDPService) send(ip net.IP, port int, bytes []byte) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
-	log.Printf("send udp data to %v\n", dstAddr)
+	//log.Printf("send udp data to %v\n", dstAddr)
 	_, err := c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
 		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"log"
+
+	"github.com/satori/go.uuid"
 )
 
 func ZipDiagramToBytes(diagram interface{}) []byte {
@@ -44,7 +45,6 @@ func BytesToUDPDiagram(data []byte, diagram interface{}) {
 	r, _ := gzip.NewReader(rdata)
 	s, _ := ioutil.ReadAll(r)
 	err := json.Unmarshal(s, &diagram)
-	log.Println(diagram)
 	if err != nil {
 		log.Fatal(err)
 	}
