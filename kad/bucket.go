@@ -17,6 +17,10 @@ func NewKBucket() *KBucket {
 	}
 }
 
+func (b *KBucket) GetAll() []*node.RemoteNode {
+	return b.nodes
+}
+
 func (b *KBucket) Add(remoteNode *node.RemoteNode) bool {
 	b.mux.Lock()
 	defer b.mux.Unlock()
