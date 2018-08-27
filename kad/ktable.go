@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/symphonyprotocol/p2p/config"
@@ -28,7 +27,6 @@ type KTable struct {
 	network   INetwork
 	localNode *node.LocalNode
 	buckets   map[int]*KBucket
-	mux       sync.Mutex
 }
 
 func NewKTable(localNode *node.LocalNode, network INetwork) *KTable {
@@ -52,7 +50,6 @@ func (t *KTable) loadInitNodes() {
 }
 
 func (t *KTable) add(remoteNode *node.RemoteNode) {
-	t.mux.Lock()
 	if remoteNode.Distance == -1 {
 		dist := distance(t.localNode.GetIDBytes(), remoteNode.GetIDBytes())
 		remoteNode.Distance = dist
@@ -68,11 +65,9 @@ func (t *KTable) add(remoteNode *node.RemoteNode) {
 		bucket.Add(remoteNode)
 		t.buckets[remoteNode.Distance] = bucket
 	}
-	t.mux.Unlock()
 }
 
 func (t *KTable) peekNodes() []*node.RemoteNode {
-	t.mux.Lock()
 	remotes := make([]*node.RemoteNode, 0)
 	for _, bucket := range t.buckets {
 		node := bucket.Peek()
@@ -80,12 +75,10 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 			remotes = append(remotes, node)
 		}
 	}
-	t.mux.Unlock()
 	return remotes
 }
 
 func (t *KTable) offline(nodeID string) {
-	t.mux.Lock()
 	log.Printf("node offline %v\n", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
@@ -95,11 +88,9 @@ func (t *KTable) offline(nodeID string) {
 		}
 
 	}
-	t.mux.Unlock()
 }
 
 func (t *KTable) refresh(nodeID string, ip string, port int) {
-	t.mux.Lock()
 	log.Printf("node refresh %v\n", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
@@ -128,7 +119,6 @@ func (t *KTable) refresh(nodeID string, ip string, port int) {
 		bucket.Add(rnode)
 		t.buckets[dist] = bucket
 	}
-	t.mux.Unlock()
 }
 
 func (t *KTable) pingPong(rnode *node.RemoteNode) bool {
