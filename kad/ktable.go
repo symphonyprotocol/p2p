@@ -106,11 +106,11 @@ func (t *KTable) refresh(nodeID string, ip string, port int) {
 	if bucket, ok := t.buckets[dist]; ok {
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
-			log.Println("refresh exist node")
+			log.Printf("refresh exist node：%v, %v, %v\n", ip, port, dist)
 			rnode.RefreshNode(ip, port)
 			bucket.MoveToTail(rnode)
 		} else {
-			log.Println("refresh to add new node")
+			log.Printf("refresh to add new node: %v, %v, %v\n", ip, port, dist)
 			ipAddr := net.ParseIP(ip)
 			rnode = node.NewRemoteNode(id, ipAddr, port)
 			if bucket.Add(rnode) {
@@ -120,6 +120,7 @@ func (t *KTable) refresh(nodeID string, ip string, port int) {
 			//todo: ping first then decide to add, ignore this action
 		}
 	} else {
+		log.Printf("refresh to add new bucket: %v, %v, %v\n", ip, port, dist)
 		ipAddr := net.ParseIP(ip)
 		rnode := node.NewRemoteNode(id, ipAddr, port)
 		rnode.Distance = dist
@@ -143,7 +144,7 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 func (t *KTable) Start() {
 	go func() {
 		for {
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 			nodes := t.peekNodes()
 			if len(nodes) == 0 {
 				t.loadInitNodes()
