@@ -76,7 +76,7 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 	remotes := make([]*node.RemoteNode, 0)
 	for _, bucket := range t.buckets {
 		node := bucket.Peek()
-		if node != nil {
+		if node != nil && node.GetID() != t.localNode.GetID() {
 			remotes = append(remotes, node)
 		}
 	}
