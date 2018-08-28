@@ -194,8 +194,53 @@ func (t *KTable) pong(msgID string, ip net.IP, port int) {
 	log.Printf("echo pong to %v:%v\n", ip.String(), port)
 }
 
-func (t *KTable) findNode() {
+func (t *KTable) findNode(rnode *node.RemoteNode) {
+	id := utils.NewUUID()
+	ts := time.Now().Unix()
+	exprie := ts + int64(models.DEFAULT_TIMEOUT)
+	fn := FindNodeDiagram{
+		UDPDiagram: models.UDPDiagram{
+			ID:        id,
+			NodeID:    t.localNode.GetID(),
+			Timestamp: ts,
+			DCategory: KTABLE_DIAGRAM_CATEGORY,
+			DType:     KTABLE_DIAGRAM_FINDNODE,
+			Version:   models.UDP_DIAGRAM_VERSION,
+			Expire:    exprie,
+		},
+	}
+	t.addWaitReply(id, ts, exprie, rnode)
+	t.network.Send(rnode.GetIP(), rnode.GetPort(), utils.DiagramToBytes(fn))
+	log.Printf("send find node to %v:%v\n", rnode.GetIP().String(), rnode.GetPort())
+}
 
+func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int) {
+	nodes := t.findNodeFromBuckets(nodeID)
+	nodeDiagrams := make([]NodeDiagram, 0)
+	for _, n := range nodes {
+		nd := NodeDiagram{
+			NodeID: n.GetID(),
+			IP:     n.GetIP().String(),
+			Port:   n.GetPort(),
+		}
+		nodeDiagrams = append(nodeDiagrams, nd)
+	}
+	ts := time.Now().Unix()
+	exprie := ts + int64(models.DEFAULT_TIMEOUT)
+	resp := FindNodeRespDiagram{
+		UDPDiagram: models.UDPDiagram{
+			ID:        msgID,
+			NodeID:    t.localNode.GetID(),
+			Timestamp: ts,
+			DCategory: KTABLE_DIAGRAM_CATEGORY,
+			DType:     KTABLE_DIAGRAM_FINDNODERESP,
+			Version:   models.UDP_DIAGRAM_VERSION,
+			Expire:    exprie,
+		},
+		Nodes: nodeDiagrams,
+	}
+	t.network.Send(ip, port, utils.DiagramToBytes(resp))
+	log.Printf("echo find node resp to %v:%v\n", ip.String(), port)
 }
 
 func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
@@ -234,6 +279,14 @@ func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
 	return nodes
 }
 
+func (t *KTable) findNodeResp(data []byte) {
+	var resp FindNodeRespDiagram
+	utils.BytesToUDPDiagram(data, &resp)
+	for _, n := range resp.Nodes {
+		t.refresh(n.NodeID, n.IP, n.Port)
+	}
+}
+
 func (t *KTable) callback(params models.CallbackParams) {
 	if obj, ok := t.waitlist.Load(params.Diagram.ID); ok {
 		wait := obj.(waitReply)
@@ -246,6 +299,10 @@ func (t *KTable) callback(params models.CallbackParams) {
 	switch params.Diagram.DType {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram.ID, params.RemoteAddr.IP, params.RemoteAddr.Port)
+	case KTABLE_DIAGRAM_FINDNODE:
+		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)
+	case KTABLE_DIAGRAM_FINDNODERESP:
+		t.findNodeResp(params.Data)
 	default:
 	}
 }
@@ -257,6 +314,7 @@ func (t *KTable) timeoutCallback(wait waitReply) {
 func (t *KTable) Start() {
 	go t.loopPing()
 	go t.loopTimeout()
+	go t.loopFindNode()
 }
 
 func (t *KTable) loopTimeout() {
@@ -299,6 +357,17 @@ func (t *KTable) loopPing() {
 			t.ping(rnode)
 		}
 		time.Sleep(10 * time.Second)
+	}
+}
+
+func (t *KTable) loopFindNode() {
+	time.Sleep(12 * time.Second)
+	for {
+		nodes := t.peekNodes()
+		for _, rnode := range nodes {
+			t.findNode(rnode)
+		}
+		time.Sleep(60 * time.Second)
 	}
 }
 
