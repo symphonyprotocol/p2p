@@ -113,6 +113,7 @@ func (t *KTable) refresh(nodeID string, ip string, port int, localIP string, loc
 		return
 	}
 	if t.localNode.GetExtIP().String() == ip {
+		log.Printf("node in same subnet map %v:%v -> %v:%v", ip, port, localIP, localPort)
 		ip = localIP
 		port = localPort
 	}

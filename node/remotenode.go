@@ -47,7 +47,7 @@ func (r *RemoteNode) RefreshNode(ip string, port int, localIP string, localPort 
 	r.ip = net.ParseIP(ip)
 	r.port = port
 	r.localIP = net.ParseIP(localIP)
-	r.port = localPort
+	r.localPort = localPort
 }
 
 func (r *RemoteNode) SetPublicKey(keyStr string) {

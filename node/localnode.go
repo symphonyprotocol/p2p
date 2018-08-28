@@ -102,10 +102,11 @@ func NewLocalNode() *LocalNode {
 			ipStr = ips[0]
 		}
 	}
-	log.Printf("setup local node ip: %v", ipStr)
+
 	ip := net.ParseIP(ipStr)
 	localNode.Node.ip = ip
 	localNode.Node.port = config.DEFAULT_UDP_PORT
+	log.Printf("setup local node ip: %v:%v\n", localNode.ip, localNode.port)
 	localNode.pubKey = privKey.PublicKey
 	log.Printf("setup local node pubkey: %v", pubKeyStr)
 	localNode.privKey = privKey
