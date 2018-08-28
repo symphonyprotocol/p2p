@@ -88,7 +88,7 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 		node := bucket.Peek()
 		if node != nil {
 			if node.GetID() == t.localNode.GetID() {
-				t.refresh(node.GetID(), node.GetIP().String(), node.GetPort())
+				t.refresh(node.GetID(), node.GetIP().String(), node.GetPort(), t.localNode.GetIP().String(), t.localNode.GetPort())
 			} else {
 				remotes = append(remotes, node)
 			}
@@ -108,9 +108,13 @@ func (t *KTable) offline(nodeID string) {
 	}
 }
 
-func (t *KTable) refresh(nodeID string, ip string, port int) {
+func (t *KTable) refresh(nodeID string, ip string, port int, localIP string, localPort int) {
 	if nodeID == t.localNode.GetID() {
 		return
+	}
+	if t.localNode.GetExtIP().String() == ip {
+		ip = localIP
+		port = localPort
 	}
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
@@ -118,7 +122,7 @@ func (t *KTable) refresh(nodeID string, ip string, port int) {
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
 			log.Printf("refresh exist node：%v, %v, %v\n", ip, port, dist)
-			rnode.RefreshNode(ip, port)
+			rnode.RefreshNode(ip, port, localIP, localPort)
 			bucket.MoveToTail(rnode)
 		} else {
 			log.Printf("refresh to add new node: %v, %v, %v\n", ip, port, dist)
@@ -166,13 +170,21 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 			DType:     KTABLE_DIAGRAM_PING,
 			Version:   models.UDP_DIAGRAM_VERSION,
 			Expire:    exprie,
+			LocalAddr: t.localNode.GetIP().String(),
+			LocalPort: t.localNode.GetPort(),
 		},
-		LocalAddr: t.localNode.GetIP().String(),
-		LocalPort: t.localNode.GetPort(),
 	}
 	t.network.Send(rnode.GetIP(), rnode.GetPort(), utils.DiagramToBytes(ping))
 	t.addWaitReply(ping.ID, ping.Timestamp, ping.Expire, rnode)
 	log.Printf("send ping to %v:%v\n", rnode.GetIP().String(), rnode.GetPort())
+}
+
+func (t *KTable) pongAction(data []byte) {
+	var pong PongDiagram
+	utils.BytesToUDPDiagram(data, &pong)
+	if t.localNode.GetExtIP().String() != pong.RemoteAddr || t.localNode.GetExtPort() != pong.RemotePort {
+		t.localNode.SetExtIP(pong.RemoteAddr, pong.RemotePort)
+	}
 }
 
 func (t *KTable) pong(msgID string, ip net.IP, port int) {
@@ -187,9 +199,9 @@ func (t *KTable) pong(msgID string, ip net.IP, port int) {
 			Version:   models.UDP_DIAGRAM_VERSION,
 			Timestamp: ts,
 			Expire:    expire,
+			LocalAddr: t.localNode.GetIP().String(),
+			LocalPort: t.localNode.GetPort(),
 		},
-		LocalAddr:  t.localNode.GetIP().String(),
-		LocalPort:  t.localNode.GetPort(),
 		RemoteAddr: ip.String(),
 		RemotePort: port,
 	}
@@ -210,6 +222,8 @@ func (t *KTable) findNode(rnode *node.RemoteNode) {
 			DType:     KTABLE_DIAGRAM_FINDNODE,
 			Version:   models.UDP_DIAGRAM_VERSION,
 			Expire:    exprie,
+			LocalAddr: t.localNode.GetIP().String(),
+			LocalPort: t.localNode.GetPort(),
 		},
 	}
 	t.addWaitReply(id, ts, exprie, rnode)
@@ -222,9 +236,11 @@ func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int
 	nodeDiagrams := make([]NodeDiagram, 0)
 	for _, n := range nodes {
 		nd := NodeDiagram{
-			NodeID: n.GetID(),
-			IP:     n.GetIP().String(),
-			Port:   n.GetPort(),
+			NodeID:    n.GetID(),
+			IP:        n.GetIP().String(),
+			Port:      n.GetPort(),
+			LocalAddr: n.GetLocalIP().String(),
+			LocalPort: n.GetLocalPort(),
 		}
 		nodeDiagrams = append(nodeDiagrams, nd)
 	}
@@ -239,6 +255,8 @@ func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int
 			DType:     KTABLE_DIAGRAM_FINDNODERESP,
 			Version:   models.UDP_DIAGRAM_VERSION,
 			Expire:    exprie,
+			LocalAddr: t.localNode.GetIP().String(),
+			LocalPort: t.localNode.GetPort(),
 		},
 		Nodes: nodeDiagrams,
 	}
@@ -287,7 +305,7 @@ func (t *KTable) findNodeResp(data []byte) {
 	var resp FindNodeRespDiagram
 	utils.BytesToUDPDiagram(data, &resp)
 	for _, n := range resp.Nodes {
-		t.refresh(n.NodeID, n.IP, n.Port)
+		t.refresh(n.NodeID, n.IP, n.Port, n.LocalAddr, n.LocalPort)
 	}
 }
 
@@ -299,10 +317,12 @@ func (t *KTable) callback(params models.CallbackParams) {
 			return
 		}
 	}
-	t.refresh(params.Diagram.NodeID, params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
+	t.refresh(params.Diagram.NodeID, params.RemoteAddr.IP.String(), params.RemoteAddr.Port, params.Diagram.LocalAddr, params.Diagram.LocalPort)
 	switch params.Diagram.DType {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram.ID, params.RemoteAddr.IP, params.RemoteAddr.Port)
+	case KTABLE_DIAGRAM_PONG:
+		t.pongAction(params.Data)
 	case KTABLE_DIAGRAM_FINDNODE:
 		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)
 	case KTABLE_DIAGRAM_FINDNODERESP:
@@ -371,7 +391,7 @@ func (t *KTable) loopFindNode() {
 		for _, rnode := range nodes {
 			t.findNode(rnode)
 		}
-		time.Sleep(60 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 

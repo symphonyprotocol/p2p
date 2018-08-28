@@ -10,7 +10,9 @@ import (
 
 type RemoteNode struct {
 	Node
-	Distance int
+	localIP   net.IP
+	localPort int
+	Distance  int
 }
 
 func (r *RemoteNode) GetID() string {
@@ -33,9 +35,19 @@ func (r *RemoteNode) GetIDBytes() []byte {
 	return r.id
 }
 
-func (r *RemoteNode) RefreshNode(ip string, port int) {
+func (r *RemoteNode) GetLocalIP() net.IP {
+	return r.localIP
+}
+
+func (r *RemoteNode) GetLocalPort() int {
+	return r.localPort
+}
+
+func (r *RemoteNode) RefreshNode(ip string, port int, localIP string, localPort int) {
 	r.ip = net.ParseIP(ip)
 	r.port = port
+	r.localIP = net.ParseIP(localIP)
+	r.port = localPort
 }
 
 func (r *RemoteNode) SetPublicKey(keyStr string) {

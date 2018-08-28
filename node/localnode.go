@@ -31,10 +31,10 @@ type Node struct {
 
 type LocalNode struct {
 	Node
-	privKey            *ecdsa.PrivateKey
-	extIP              *net.IP
-	extUPort, extTPort int
-	isPublic           bool
+	privKey  *ecdsa.PrivateKey
+	extIP    net.IP
+	extPort  int
+	isPublic bool
 }
 
 func (n *LocalNode) GetID() string {
@@ -57,9 +57,22 @@ func (n *LocalNode) GetPort() int {
 	return n.port
 }
 
+func (n *LocalNode) GetExtIP() net.IP {
+	return n.extIP
+}
+
+func (n *LocalNode) GetExtPort() int {
+	return n.extPort
+}
+
 func (n *LocalNode) RefreshNode(ip string, port int) {
 	n.ip = net.ParseIP(ip)
 	n.port = port
+}
+
+func (n *LocalNode) SetExtIP(ip string, port int) {
+	n.extIP = net.ParseIP(ip)
+	n.extPort = port
 }
 
 func NewLocalNode() *LocalNode {
@@ -110,23 +123,18 @@ func (n *LocalNode) DiscoverNAT() {
 		index := 0
 		dictPorts := make(map[int]int)
 		for {
-			protocol, ip, extPort, _ := upnp.GetGenericPortMappingEntry(index, client)
+			_, ip, extPort, _ := upnp.GetGenericPortMappingEntry(index, client)
 			if extPort == 0 {
 				break
 			}
 			if ip == n.ip.String() {
 				//log.Println("find ip %v %v", protocol, extPort)
-				if protocol == "UDP" {
-					n.extUPort = extPort
-				}
-				if protocol == "TCP" {
-					n.extTPort = extPort
-				}
+				n.extPort = extPort
 			}
 			dictPorts[extPort] = 1
 			index++
 		}
-		if n.extUPort == 0 {
+		if n.extPort == 0 {
 			for {
 				if _, ok := dictPorts[mappingPort]; ok {
 					mappingPort++
@@ -150,9 +158,8 @@ func (n *LocalNode) DiscoverNAT() {
 			n.isPublic = nat.IsIntranet(externalIP)
 			if n.isPublic {
 				extIp := net.ParseIP(externalIP)
-				n.extIP = &extIp
-				n.extUPort = mappingPort
-				n.extTPort = mappingPort
+				n.extIP = extIp
+				n.extPort = mappingPort
 			}
 		}
 	}

@@ -14,14 +14,10 @@ var (
 
 type PingDiagram struct {
 	models.UDPDiagram
-	LocalAddr string
-	LocalPort int
 }
 
 type PongDiagram struct {
 	models.UDPDiagram
-	LocalAddr  string
-	LocalPort  int
 	RemoteAddr string
 	RemotePort int
 }
@@ -36,7 +32,9 @@ type FindNodeRespDiagram struct {
 }
 
 type NodeDiagram struct {
-	NodeID string
-	IP     string
-	Port   int
+	NodeID    string
+	IP        string
+	Port      int
+	LocalAddr string
+	LocalPort int
 }

@@ -17,6 +17,8 @@ type UDPDiagram struct {
 	DType     string
 	Version   int
 	Expire    int64
+	LocalAddr string
+	LocalPort int
 }
 
 type CallbackParams struct {
