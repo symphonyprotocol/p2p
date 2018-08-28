@@ -271,6 +271,7 @@ func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
 					break
 				}
 			}
+			j++
 		}
 		if len(nodes) >= BUCKETS_SIZE {
 			break
