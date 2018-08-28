@@ -109,6 +109,9 @@ func (t *KTable) offline(nodeID string) {
 }
 
 func (t *KTable) refresh(nodeID string, ip string, port int) {
+	if nodeID == t.localNode.GetID() {
+		return
+	}
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -260,8 +263,8 @@ func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
 					break
 				}
 			}
-			i--
 		}
+		i--
 		if bucket, ok := t.buckets[j]; j < 256 && ok {
 			jnodes := bucket.GetAll()
 			for _, jnd := range jnodes {
@@ -271,8 +274,8 @@ func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
 					break
 				}
 			}
-			j++
 		}
+		j++
 		if len(nodes) >= BUCKETS_SIZE {
 			break
 		}
