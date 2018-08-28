@@ -57,6 +57,9 @@ func NewKTable(localNode *node.LocalNode, network interfaces.INetwork) *KTable {
 func (t *KTable) loadInitNodes() {
 	staticNodes := initialStaticNodes()
 	for _, node := range staticNodes {
+		if node.GetID() == t.localNode.GetID() {
+			continue
+		}
 		t.add(node)
 	}
 }
@@ -106,7 +109,6 @@ func (t *KTable) offline(nodeID string) {
 }
 
 func (t *KTable) refresh(nodeID string, ip string, port int) {
-	log.Printf("node refresh %v\n", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -167,6 +169,7 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 	}
 	t.network.Send(rnode.GetIP(), rnode.GetPort(), utils.DiagramToBytes(ping))
 	t.addWaitReply(ping.ID, ping.Timestamp, ping.Expire, rnode)
+	log.Printf("send ping to %v:%v\n", rnode.GetIP().String(), rnode.GetPort())
 }
 
 func (t *KTable) pong(msgID string, ip net.IP, port int) {
@@ -188,6 +191,7 @@ func (t *KTable) pong(msgID string, ip net.IP, port int) {
 		RemotePort: port,
 	}
 	t.network.Send(ip, port, utils.DiagramToBytes(pong))
+	log.Printf("echo pong to %v:%v\n", ip.String(), port)
 }
 
 func (t *KTable) findNode() {
@@ -287,7 +291,6 @@ func (t *KTable) loopTimeout() {
 
 func (t *KTable) loopPing() {
 	for {
-		time.Sleep(10 * time.Second)
 		nodes := t.peekNodes()
 		if len(nodes) == 0 {
 			t.loadInitNodes()
@@ -295,6 +298,7 @@ func (t *KTable) loopPing() {
 		for _, rnode := range nodes {
 			t.ping(rnode)
 		}
+		time.Sleep(10 * time.Second)
 	}
 }
 
