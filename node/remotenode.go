@@ -10,9 +10,10 @@ import (
 
 type RemoteNode struct {
 	Node
-	localIP   net.IP
-	localPort int
-	Distance  int
+	localIP      net.IP
+	localPort    int
+	Distance     int
+	InSameSubnet bool
 }
 
 func (r *RemoteNode) GetID() string {

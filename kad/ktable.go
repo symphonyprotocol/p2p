@@ -112,11 +112,7 @@ func (t *KTable) refresh(nodeID string, ip string, port int, localIP string, loc
 	if nodeID == t.localNode.GetID() {
 		return
 	}
-	if t.localNode.GetExtIP().String() == ip {
-		log.Printf("node in same subnet map %v:%v -> %v:%v", ip, port, localIP, localPort)
-		ip = localIP
-		port = localPort
-	}
+
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -140,6 +136,10 @@ func (t *KTable) refresh(nodeID string, ip string, port int, localIP string, loc
 		ipAddr := net.ParseIP(ip)
 		rnode := node.NewRemoteNode(id, ipAddr, port)
 		rnode.Distance = dist
+		if t.localNode.GetExtIP().String() == ip {
+			log.Printf("node in same subnet map %v:%v -> %v:%v", ip, port, localIP, localPort)
+			rnode.InSameSubnet = true
+		}
 		bucket := NewKBucket()
 		bucket.Add(rnode)
 		t.buckets[dist] = bucket
