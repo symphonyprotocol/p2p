@@ -19,8 +19,6 @@ type UDPDiagram struct {
 	Expire    int64
 	LocalAddr string
 	LocalPort int
-	NatAddr   string
-	NatPort   int
 }
 
 type CallbackParams struct {

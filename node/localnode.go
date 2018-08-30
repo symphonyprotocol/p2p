@@ -157,7 +157,7 @@ func (n *LocalNode) DiscoverNAT() {
 			log.Printf("upnp get external ip address error:%v", err)
 			n.isPublic = false
 		} else {
-			n.isPublic = nat.IsIntranet(externalIP)
+			n.isPublic = !nat.IsIntranet(externalIP)
 			if n.isPublic {
 				extIP := net.ParseIP(externalIP)
 				n.remoteIP = extIP
