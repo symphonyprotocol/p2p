@@ -19,6 +19,7 @@ var (
 
 	DEFAULT_UDP_PORT = 32768
 	DEFAULT_TCP_PORT = 32768
+	DEFAULT_NET_WORK = "MINOR"
 )
 
 type StaticNodes struct {

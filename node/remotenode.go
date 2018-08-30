@@ -2,7 +2,7 @@ package node
 
 import (
 	//"crypto/ecdsa"
-	"encoding/hex"
+
 	"net"
 
 	symen "github.com/symphonyprotocol/p2p/encrypt"
@@ -10,56 +10,35 @@ import (
 
 type RemoteNode struct {
 	Node
-	localIP      net.IP
-	localPort    int
-	Distance     int
-	InSameSubnet bool
+	Distance int
 }
 
-func (r *RemoteNode) GetID() string {
-	return hex.EncodeToString(r.id)
-}
-
-func (r *RemoteNode) GetPublicKey() string {
-	return symen.FromPublicKey(r.pubKey)
-}
-
-func (r *RemoteNode) GetIP() net.IP {
-	return r.ip
-}
-
-func (r *RemoteNode) GetPort() int {
-	return r.port
-}
-
-func (r *RemoteNode) GetIDBytes() []byte {
-	return r.id
-}
-
-func (r *RemoteNode) GetLocalIP() net.IP {
-	return r.localIP
-}
-
-func (r *RemoteNode) GetLocalPort() int {
-	return r.localPort
-}
-
-func (r *RemoteNode) RefreshNode(ip string, port int, localIP string, localPort int) {
-	r.ip = net.ParseIP(ip)
-	r.port = port
+func (r *RemoteNode) RefreshNode(localIP string, localPort int, remoteIP string, remotePort int) {
 	r.localIP = net.ParseIP(localIP)
 	r.localPort = localPort
+	r.remoteIP = net.ParseIP(remoteIP)
+	r.remotePort = remotePort
 }
 
 func (r *RemoteNode) SetPublicKey(keyStr string) {
 	r.pubKey = symen.ToPublicKey(keyStr)
 }
 
-func NewRemoteNode(id []byte, ip net.IP, port int) *RemoteNode {
+func (r *RemoteNode) GetSendIPWithPort(local *LocalNode) (net.IP, int) {
+	//remote and local are behind same NAT
+	if r.remoteIP.String() == local.remoteIP.String() {
+		return r.localIP, r.localPort
+	}
+	return r.remoteIP, r.remotePort
+}
+
+func NewRemoteNode(id []byte, localIP net.IP, localPort int, remoteIP net.IP, remotePort int) *RemoteNode {
 	remote := &RemoteNode{}
 	remote.Node.id = id
-	remote.Node.port = port
-	remote.Node.ip = ip
+	remote.Node.localIP = localIP
+	remote.Node.localPort = localPort
+	remote.Node.remoteIP = remoteIP
+	remote.Node.remotePort = remotePort
 	remote.Distance = -1
 	return remote
 }

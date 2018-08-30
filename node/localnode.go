@@ -23,56 +23,56 @@ type Interface interface {
 }
 
 type Node struct {
-	id     []byte
-	ip     net.IP
-	port   int
-	pubKey ecdsa.PublicKey
+	id         []byte
+	localIP    net.IP
+	localPort  int
+	remoteIP   net.IP
+	remotePort int
+	pubKey     ecdsa.PublicKey
+	network    string
+}
+
+func (n *Node) GetID() string {
+	return hex.EncodeToString(n.id)
+}
+
+func (n *Node) GetIDBytes() []byte {
+	return n.id
+}
+
+func (n *Node) GetPublicKey() string {
+	return symen.FromPublicKey(n.pubKey)
+}
+
+func (n *Node) GetLocalIP() net.IP {
+	return n.localIP
+}
+
+func (n *Node) GetLocalPort() int {
+	return n.localPort
+}
+
+func (n *Node) GetRemoteIP() net.IP {
+	return n.remoteIP
+}
+
+func (n *Node) GetRemotePort() int {
+	return n.remotePort
+}
+
+func (n *Node) GetNetwork() string {
+	return n.GetNetwork()
 }
 
 type LocalNode struct {
 	Node
 	privKey  *ecdsa.PrivateKey
-	extIP    net.IP
-	extPort  int
 	isPublic bool
 }
 
-func (n *LocalNode) GetID() string {
-	return hex.EncodeToString(n.id)
-}
-
-func (n *LocalNode) GetIDBytes() []byte {
-	return n.id
-}
-
-func (n *LocalNode) GetPublicKey() string {
-	return symen.FromPublicKey(n.pubKey)
-}
-
-func (n *LocalNode) GetIP() net.IP {
-	return n.ip
-}
-
-func (n *LocalNode) GetPort() int {
-	return n.port
-}
-
-func (n *LocalNode) GetExtIP() net.IP {
-	return n.extIP
-}
-
-func (n *LocalNode) GetExtPort() int {
-	return n.extPort
-}
-
-func (n *LocalNode) RefreshNode(ip string, port int) {
-	n.ip = net.ParseIP(ip)
-	n.port = port
-}
-
-func (n *LocalNode) SetExtIP(ip string, port int) {
-	n.extIP = net.ParseIP(ip)
-	n.extPort = port
+func (n *LocalNode) SetRemoteIPPort(ip string, port int) {
+	n.remoteIP = net.ParseIP(ip)
+	n.remotePort = port
 }
 
 func NewLocalNode() *LocalNode {
@@ -91,6 +91,7 @@ func NewLocalNode() *LocalNode {
 	}
 	localNode := &LocalNode{}
 	localNode.Node.id = symen.PublicKeyToNodeId(privKey.PublicKey)
+	localNode.Node.network = config.DEFAULT_NET_WORK
 	log.Printf("setup local node: %v", localNode.GetID())
 	var ipStr string
 	ipStr, err := nat.GetOutbountIP()
@@ -104,9 +105,9 @@ func NewLocalNode() *LocalNode {
 	}
 
 	ip := net.ParseIP(ipStr)
-	localNode.Node.ip = ip
-	localNode.Node.port = config.DEFAULT_UDP_PORT
-	log.Printf("setup local node ip: %v:%v\n", localNode.ip, localNode.port)
+	localNode.Node.localIP = ip
+	localNode.Node.localPort = config.DEFAULT_UDP_PORT
+	log.Printf("setup local node ip: %v:%v\n", localNode.localIP, localNode.localPort)
 	localNode.pubKey = privKey.PublicKey
 	log.Printf("setup local node pubkey: %v", pubKeyStr)
 	localNode.privKey = privKey
@@ -120,7 +121,7 @@ func (n *LocalNode) DiscoverNAT() {
 	}
 	if ok := client.Discover(); ok {
 		// add mapping ports
-		mappingPort := config.DEFAULT_UDP_PORT
+		mappingPort := 0
 		index := 0
 		dictPorts := make(map[int]int)
 		for {
@@ -128,14 +129,14 @@ func (n *LocalNode) DiscoverNAT() {
 			if extPort == 0 {
 				break
 			}
-			if ip == n.ip.String() {
-				//log.Println("find ip %v %v", protocol, extPort)
-				n.extPort = extPort
+			if ip == n.localIP.String() {
+				mappingPort = extPort
 			}
 			dictPorts[extPort] = 1
 			index++
 		}
-		if n.extPort == 0 {
+		if mappingPort == 0 {
+			mappingPort = config.DEFAULT_UDP_PORT
 			for {
 				if _, ok := dictPorts[mappingPort]; ok {
 					mappingPort++
@@ -143,10 +144,10 @@ func (n *LocalNode) DiscoverNAT() {
 					break
 				}
 			}
-			if ok := upnp.AddPortMapping(n.ip.String(), config.DEFAULT_UDP_PORT, mappingPort, "UDP", client); ok {
+			if ok := upnp.AddPortMapping(n.localIP.String(), config.DEFAULT_UDP_PORT, mappingPort, "UDP", client); ok {
 				log.Printf("add port mapping for UDP from %v to %v\n", config.DEFAULT_UDP_PORT, mappingPort)
 			}
-			if ok := upnp.AddPortMapping(n.ip.String(), config.DEFAULT_TCP_PORT, mappingPort, "TCP", client); ok {
+			if ok := upnp.AddPortMapping(n.localIP.String(), config.DEFAULT_TCP_PORT, mappingPort, "TCP", client); ok {
 				log.Printf("add port mapping for TCP from %v to %v\n", config.DEFAULT_TCP_PORT, mappingPort)
 			}
 		}
@@ -158,9 +159,9 @@ func (n *LocalNode) DiscoverNAT() {
 		} else {
 			n.isPublic = nat.IsIntranet(externalIP)
 			if n.isPublic {
-				extIp := net.ParseIP(externalIP)
-				n.extIP = extIp
-				n.extPort = mappingPort
+				extIP := net.ParseIP(externalIP)
+				n.remoteIP = extIP
+				n.remotePort = mappingPort
 			}
 		}
 	}

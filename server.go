@@ -17,7 +17,7 @@ type P2PServer struct {
 
 func NewP2PServer() *P2PServer {
 	node := node.NewLocalNode()
-	udpService := udp.NewUDPService(node.GetID(), node.GetIP(), node.GetPort())
+	udpService := udp.NewUDPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
 	ktable := kad.NewKTable(node, udpService)
 	srv := &P2PServer{
 		node:       node,

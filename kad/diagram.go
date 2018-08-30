@@ -32,9 +32,9 @@ type FindNodeRespDiagram struct {
 }
 
 type NodeDiagram struct {
-	NodeID    string
-	IP        string
-	Port      int
-	LocalAddr string
-	LocalPort int
+	NodeID     string
+	RemoteIP   string
+	RemotePort int
+	LocalAddr  string
+	LocalPort  int
 }
