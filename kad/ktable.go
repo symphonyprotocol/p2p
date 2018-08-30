@@ -157,6 +157,7 @@ func (t *KTable) addWaitReply(msgID string, sendTs int64, expireTs int64, rnode 
 func (t *KTable) send(rnode *node.RemoteNode, data []byte) {
 	ip, port := rnode.GetSendIPWithPort(t.localNode)
 	t.network.Send(ip, port, data)
+	log.Printf("send udp data to %v:%v\n", ip.String(), port)
 }
 
 func (t *KTable) ping(rnode *node.RemoteNode) {
@@ -318,7 +319,7 @@ func (t *KTable) callback(params models.CallbackParams) {
 			return
 		}
 	}
-	t.refresh(params.Diagram.NodeID, params.RemoteAddr.IP.String(), params.RemoteAddr.Port, params.Diagram.LocalAddr, params.Diagram.LocalPort)
+	t.refresh(params.Diagram.NodeID, params.Diagram.LocalAddr, params.Diagram.LocalPort, params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
 	switch params.Diagram.DType {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram, params.RemoteAddr)
