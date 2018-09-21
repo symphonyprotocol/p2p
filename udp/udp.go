@@ -2,13 +2,15 @@ package udp
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 
+	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/models"
 	"github.com/symphonyprotocol/p2p/utils"
 )
+
+var logger = log.GetLogger("udp")
 
 type UDPService struct {
 	listener    *net.UDPConn
@@ -41,12 +43,12 @@ func (c *UDPService) RemoveCallback(category string) {
 }
 
 func (c *UDPService) loop() {
-	log.Println("start listenning udp...")
+	logger.Trace("start listenning udp...")
 	data := make([]byte, 1280)
 	for {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf("UPDServer loop err:%V\n", err)
+				logger.Trace("UPDServer loop err:%v\n", err)
 			}
 		}()
 		n, remoteAddr, err := c.listener.ReadFromUDP(data)
@@ -69,7 +71,7 @@ func (c *UDPService) loop() {
 
 func (c *UDPService) Send(ip net.IP, port int, bytes []byte) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
-	//log.Printf("send udp data to %v\n", dstAddr)
+	//logger.Trace("send udp data to %v\n", dstAddr)
 	_, err := c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
 		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)

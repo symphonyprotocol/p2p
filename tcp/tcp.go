@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"sync"
 	"net"
-	"log"
+	"github.com/symphonyprotocol/log"
 
 	"github.com/symphonyprotocol/p2p/models"
 	"github.com/symphonyprotocol/p2p/interfaces"
+	"github.com/symphonyprotocol/p2p/utils"
 )
+
+var logger = log.GetLogger("tcp")
 
 type TCPConnection struct {
 	*net.TCPConn
@@ -58,7 +61,7 @@ func (tcp *TCPService) getConnectionKey(ip net.IP, port int) string {
 }
 
 func (tcp *TCPService) loop() {
-	log.Println("Start listening TCP connections...")
+	logger.Trace("Start listening TCP connections...")
 	for {
 		conn, err := tcp.listener.AcceptTCP()
 		if err != nil {
@@ -67,10 +70,20 @@ func (tcp *TCPService) loop() {
 		remoteAddr := conn.RemoteAddr()
 		tcpAddr, err := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
 		if err != nil {
-			log.Printf("Failed to parse remote addr from the new tcp connection\n")
+			logger.Trace("Failed to parse remote addr from the new tcp connection\n")
 		}
+		the_key := tcp.getConnectionKey(tcpAddr.IP, tcpAddr.Port)
+		// 1. check if connection in map
+		if _conn, ok := tcp.connections.Load(the_key); ok {
+			if _, ok := _conn.(*TCPConnection); ok {
+				// conn already exists.. opened by us
+				conn.Close()
+				continue
+			}
+		} 
+		// 2. accept this connection
 		the_conn := NewTCPConnection(conn, true)
-		tcp.connections.Store(tcp.getConnectionKey(tcpAddr.IP, tcpAddr.Port), the_conn)
+		tcp.connections.Store(the_key, the_conn)
 		go tcp.handleConnection(the_conn)
 	}
 }
@@ -84,10 +97,32 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection) {
 			quit = true
 		default:
 			// keep reading from conn
+			data := make([]byte, 1280)
+			n, err := conn.Read(data)
+			if err != nil {
+				if err != nil {
+					logger.Trace("conn: read: %s", err)
+				}
+				break
+			}
+
+			remoteAddr := conn.RemoteAddr()
+			tcpAddr, err := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
+			rdata := data[:n]
+			var diagram models.TCPDiagram
+			utils.BytesToUDPDiagram(rdata, &diagram)
+			if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
+				callback := obj.(func(models.TCPCallbackParams))
+				callback(models.TCPCallbackParams{
+					RemoteAddr: tcpAddr,
+					Diagram:    diagram,
+					Data:       rdata,
+				})
+			}
 		}
 
 		if quit {
-			log.Printf("TCP Connection to %v quit by signal\n", conn.RemoteAddr().String())
+			logger.Trace("TCP Connection to %v quit by signal\n", conn.RemoteAddr().String())
 			break
 		}
 	}
@@ -107,7 +142,7 @@ func (tcp *TCPService) getConnection(ip net.IP, port int) (*TCPConnection, error
 	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
 	conn, err := net.DialTCP("tcp", localIP, remoteIP)
 	if err != nil {
-		log.Printf("Failed to open tcp connection to %v:%v\n", ip.String(), port)
+		logger.Trace("Failed to open tcp connection to %v:%v\n", ip.String(), port)
 		return nil, err
 	}
 
@@ -135,7 +170,7 @@ func (tcp *TCPService) closeConnection(ip net.IP, port int) {
 		}
 	}
 
-	log.Printf("Failed to close connection %v", key)
+	logger.Trace("Failed to close connection %v", key)
 }
 
 func (c *TCPService) RegisterCallback(category string, callback func(models.CallbackParams)) {
@@ -149,15 +184,20 @@ func (c *TCPService) RemoveCallback(category string) {
 func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
 	conn, err := c.getConnection(ip, port)
 	if err != nil {
-		log.Printf("Failed to send packet (%d) to %v:%v\n", len(bytes), ip.String(), port)
+		logger.Trace("Failed to send packet (%d) to %v:%v\n", len(bytes), ip.String(), port)
 		return
 	}
 
 	// TODO: chunksize
+	// TODO: encryption (can be done by tls on tcp connection?)
 	length, err := conn.Write(bytes)
 	if err != nil {
-		log.Printf("Failed to send packet (%d) to %v:%v\n", length, ip.String(), port)
+		logger.Trace("Failed to send packet (%d) to %v:%v\n", length, ip.String(), port)
 	} else {
-		log.Printf("Packet (%d) sent to %v:%v\n", length, ip.String(), port)
+		logger.Trace("Packet (%d) sent to %v:%v\n", length, ip.String(), port)
 	}
+}
+
+func (tcp *TCPService) Start() {
+	go tcp.loop()
 }

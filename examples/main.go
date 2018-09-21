@@ -35,6 +35,9 @@ func initialKtable() {
 func initialServer() {
 	srv := p2p.NewP2PServer()
 	srv.Start()
+
+	// try to dial to each other
+	
 }
 
 type BaseDiagram struct {

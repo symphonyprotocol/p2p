@@ -3,12 +3,12 @@ package kad
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/models"
 
 	"github.com/symphonyprotocol/p2p/config"
@@ -20,6 +20,7 @@ import (
 var (
 	//BUCKETS_TOTAL = 256
 	BUCKETS_SIZE = 8
+	logger = log.GetLogger("ktable")
 )
 
 type RecieveData struct {
@@ -97,7 +98,7 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 }
 
 func (t *KTable) offline(nodeID string) {
-	log.Printf("node offline %v\n", nodeID)
+	logger.Trace("node offline %v", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -114,26 +115,26 @@ func (t *KTable) refresh(nodeID string, localIP string, localPort int, remoteIP 
 
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
-	log.Printf("refresh exist node：%v:%v -> %v:%v, %v\n", localIP, localPort, remoteIP, remotePort, dist)
+	logger.Trace("refresh exist node：%v:%v -> %v:%v, %v", localIP, localPort, remoteIP, remotePort, dist)
 	if bucket, ok := t.buckets[dist]; ok {
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
-			//log.Printf("refresh exist node：%v, %v, %v\n", remoteIP, remotePort, dist)
+			//logger.Trace("refresh exist node：%v, %v, %v", remoteIP, remotePort, dist)
 			rnode.RefreshNode(localIP, localPort, remoteIP, remotePort)
 			bucket.MoveToTail(rnode)
 		} else {
-			//log.Printf("refresh to add new node: %v, %v, %v\n", remoteIP, remotePort, dist)
+			//logger.Trace("refresh to add new node: %v, %v, %v", remoteIP, remotePort, dist)
 			localAddr := net.ParseIP(localIP)
 			remoteAddr := net.ParseIP(remoteIP)
 			rnode = node.NewRemoteNode(id, localAddr, localPort, remoteAddr, remotePort)
 			if bucket.Add(rnode) {
 				return
 			}
-			//log.Println("refresh to ping first node")
+			//logger.Trace("refresh to ping first node")
 			//todo: ping first then decide to add, ignore this action
 		}
 	} else {
-		log.Printf("refresh to add new bucket: %v, %v, %v\n", remoteIP, remotePort, dist)
+		logger.Trace("refresh to add new bucket: %v, %v, %v", remoteIP, remotePort, dist)
 		localAddr := net.ParseIP(localIP)
 		remoteAddr := net.ParseIP(remoteIP)
 		rnode := node.NewRemoteNode(id, localAddr, localPort, remoteAddr, remotePort)
@@ -180,7 +181,7 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 	}
 	t.send(rnode, utils.DiagramToBytes(ping))
 	t.addWaitReply(ping.ID, ping.Timestamp, ping.Expire, rnode)
-	log.Printf("send ping to %v:%v\n", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
+	logger.Trace("send ping to %v:%v", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
 }
 
 func (t *KTable) pongAction(data []byte) {
@@ -211,7 +212,7 @@ func (t *KTable) pong(diagram models.UDPDiagram, remoteAddr *net.UDPAddr) {
 	}
 	rnode := node.NewRemoteNode([]byte(diagram.NodeID), net.ParseIP(diagram.LocalAddr), diagram.LocalPort, remoteAddr.IP, remoteAddr.Port)
 	t.send(rnode, utils.DiagramToBytes(pong))
-	log.Printf("echo pong to %v:%v\n", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
+	logger.Trace("echo pong to %v:%v", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
 }
 
 func (t *KTable) findNode(rnode *node.RemoteNode) {
@@ -233,7 +234,7 @@ func (t *KTable) findNode(rnode *node.RemoteNode) {
 	}
 	t.send(rnode, utils.DiagramToBytes(fn))
 	t.addWaitReply(id, ts, exprie, rnode)
-	log.Printf("send find node to %v:%v\n", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
+	logger.Trace("send find node to %v:%v", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
 }
 
 func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int) {
@@ -266,7 +267,7 @@ func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int
 		Nodes: nodeDiagrams,
 	}
 	t.network.Send(ip, port, utils.DiagramToBytes(resp))
-	log.Printf("echo find node resp to %v:%v\n", ip.String(), port)
+	logger.Trace("echo find node resp to %v:%v", ip.String(), port)
 }
 
 func (t *KTable) findNodeFromBuckets(nodeID string) []*node.RemoteNode {
@@ -312,7 +313,7 @@ func (t *KTable) findNodeResp(data []byte) {
 	for _, n := range resp.Nodes {
 		t.refresh(n.NodeID, n.LocalAddr, n.LocalPort, n.RemoteIP, n.RemotePort)
 	}
-	log.Println("recieve find node resp")
+	logger.Trace("recieve find node resp")
 }
 
 func (t *KTable) callback(params models.CallbackParams) {
@@ -328,7 +329,7 @@ func (t *KTable) callback(params models.CallbackParams) {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram, params.RemoteAddr)
 	case KTABLE_DIAGRAM_PONG:
-		log.Printf("recieve pong from %v:%v\n", params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
+		logger.Trace("recieve pong from %v:%v", params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
 		t.pongAction(params.Data)
 	case KTABLE_DIAGRAM_FINDNODE:
 		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)

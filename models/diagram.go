@@ -26,3 +26,18 @@ type CallbackParams struct {
 	Diagram    UDPDiagram
 	Data       []byte
 }
+
+type TCPDiagram struct {
+	ID			string
+	NodeID		string
+	Timestamp	int64
+	DCategory	string
+	DType		string
+	Version		int
+}
+
+type TCPCallbackParams struct {
+	RemoteAddr	*net.TCPAddr
+	Diagram		TCPDiagram
+	Data		[]byte
+}
