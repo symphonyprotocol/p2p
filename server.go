@@ -14,6 +14,7 @@ type P2PServer struct {
 	ktable     *kad.KTable
 	udpService *udp.UDPService
 	tcpService *tcp.TCPService
+	syncManager	*tcp.SyncManager
 	quit       chan int
 }
 
@@ -22,12 +23,14 @@ func NewP2PServer() *P2PServer {
 	udpService := udp.NewUDPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
 	tcpService := tcp.NewTCPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
 	ktable := kad.NewKTable(node, udpService)
+	syncManager := tcp.NewSyncManager(ktable, tcpService, tcp.NewFileSyncProvider())
 	srv := &P2PServer{
 		node:       node,
 		ktable:     ktable,
 		udpService: udpService,
 		tcpService: tcpService,
 		quit:       make(chan int),
+		syncManager: syncManager,
 	}
 	return srv
 }
@@ -38,6 +41,7 @@ func (s *P2PServer) Start() {
 	s.udpService.Start()
 	s.tcpService.Start()
 	s.ktable.Start()
+	s.syncManager.Start()
 	defer close(s.quit)
 	<-s.quit
 }

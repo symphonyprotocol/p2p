@@ -48,7 +48,7 @@ func (c *UDPService) loop() {
 	for {
 		defer func() {
 			if err := recover(); err != nil {
-				logger.Trace("UPDServer loop err:%v\n", err)
+				logger.Trace("UPDServer loop err:%v", err)
 			}
 		}()
 		n, remoteAddr, err := c.listener.ReadFromUDP(data)
@@ -71,7 +71,7 @@ func (c *UDPService) loop() {
 
 func (c *UDPService) Send(ip net.IP, port int, bytes []byte) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
-	//logger.Trace("send udp data to %v\n", dstAddr)
+	//logger.Trace("send udp data to %v", dstAddr)
 	_, err := c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
 		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)

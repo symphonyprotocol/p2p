@@ -11,7 +11,7 @@ import (
 	"github.com/symphonyprotocol/p2p/utils"
 )
 
-var logger = log.GetLogger("tcp")
+var tcpLogger = log.GetLogger("tcp")
 
 type TCPConnection struct {
 	*net.TCPConn
@@ -61,7 +61,7 @@ func (tcp *TCPService) getConnectionKey(ip net.IP, port int) string {
 }
 
 func (tcp *TCPService) loop() {
-	logger.Trace("Start listening TCP connections...")
+	tcpLogger.Trace("Start listening TCP connections...")
 	for {
 		conn, err := tcp.listener.AcceptTCP()
 		if err != nil {
@@ -70,7 +70,7 @@ func (tcp *TCPService) loop() {
 		remoteAddr := conn.RemoteAddr()
 		tcpAddr, err := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
 		if err != nil {
-			logger.Trace("Failed to parse remote addr from the new tcp connection\n")
+			tcpLogger.Trace("Failed to parse remote addr from the new tcp connection")
 		}
 		the_key := tcp.getConnectionKey(tcpAddr.IP, tcpAddr.Port)
 		// 1. check if connection in map
@@ -100,29 +100,33 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection) {
 			data := make([]byte, 1280)
 			n, err := conn.Read(data)
 			if err != nil {
-				if err != nil {
-					logger.Trace("conn: read: %s", err)
-				}
-				break
-			}
+				tcpLogger.Trace("conn: read: %s", err)
+				quit = true
+			} else {
 
-			remoteAddr := conn.RemoteAddr()
-			tcpAddr, err := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
-			rdata := data[:n]
-			var diagram models.TCPDiagram
-			utils.BytesToUDPDiagram(rdata, &diagram)
-			if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
-				callback := obj.(func(models.TCPCallbackParams))
-				callback(models.TCPCallbackParams{
-					RemoteAddr: tcpAddr,
-					Diagram:    diagram,
-					Data:       rdata,
-				})
+				tcpLogger.Trace("conn: received: %v bytes", n)
+				remoteAddr := conn.RemoteAddr()
+				tcpAddr, _ := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
+				rdata := data[:n]
+				var diagram models.TCPDiagram
+				utils.BytesToUDPDiagram(rdata, &diagram)
+				if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
+					callback := obj.(func(models.TCPCallbackParams))
+					callback(models.TCPCallbackParams{
+						RemoteAddr: tcpAddr,
+						Diagram:    diagram,
+						Data:       rdata,
+					})
+				}
 			}
 		}
 
 		if quit {
-			logger.Trace("TCP Connection to %v quit by signal\n", conn.RemoteAddr().String())
+			tcpLogger.Trace("TCP Connection to %v quit by signal", conn.RemoteAddr().String())
+			// 2. close this connection
+			conn.Close()
+			// 3. remove from map
+			//tcp.connections.Delete(key)
 			break
 		}
 	}
@@ -138,11 +142,11 @@ func (tcp *TCPService) getConnection(ip net.IP, port int) (*TCPConnection, error
 	} 
 
 	// 2. create new connection
-	localIP := &net.TCPAddr{ IP: tcp.ip, Port: tcp.port }
+	// localIP := &net.TCPAddr{ IP: tcp.ip, Port: tcp.port }
 	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
-	conn, err := net.DialTCP("tcp", localIP, remoteIP)
+	conn, err := net.DialTCP("tcp", nil, remoteIP)
 	if err != nil {
-		logger.Trace("Failed to open tcp connection to %v:%v\n", ip.String(), port)
+		tcpLogger.Trace("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err
 	}
 
@@ -162,15 +166,11 @@ func (tcp *TCPService) closeConnection(ip net.IP, port int) {
 		if conn, ok := _conn.(*TCPConnection); ok {
 			// 1. stop the handle Inbound Connection loop for this connection
 			conn.stop <- struct{}{}
-			// 2. close this connection
-			conn.Close()
-			// 3. remove from map
-			tcp.connections.Delete(key)
 			return
 		}
 	}
 
-	logger.Trace("Failed to close connection %v", key)
+	tcpLogger.Trace("Failed to close connection %v", key)
 }
 
 func (c *TCPService) RegisterCallback(category string, callback func(models.CallbackParams)) {
@@ -184,7 +184,7 @@ func (c *TCPService) RemoveCallback(category string) {
 func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
 	conn, err := c.getConnection(ip, port)
 	if err != nil {
-		logger.Trace("Failed to send packet (%d) to %v:%v\n", len(bytes), ip.String(), port)
+		tcpLogger.Trace("Failed to send packet (%d) to %v:%v", len(bytes), ip.String(), port)
 		return
 	}
 
@@ -192,9 +192,9 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
 	// TODO: encryption (can be done by tls on tcp connection?)
 	length, err := conn.Write(bytes)
 	if err != nil {
-		logger.Trace("Failed to send packet (%d) to %v:%v\n", length, ip.String(), port)
+		tcpLogger.Trace("Failed to send packet (%d) to %v:%v", length, ip.String(), port)
 	} else {
-		logger.Trace("Packet (%d) sent to %v:%v\n", length, ip.String(), port)
+		tcpLogger.Trace("Packet (%d) sent to %v:%v", length, ip.String(), port)
 	}
 }
 

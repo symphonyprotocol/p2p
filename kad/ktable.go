@@ -21,6 +21,7 @@ var (
 	//BUCKETS_TOTAL = 256
 	BUCKETS_SIZE = 8
 	logger = log.GetLogger("ktable")
+	pingTime = make(map[string]time.Time)
 )
 
 type RecieveData struct {
@@ -86,7 +87,7 @@ func (t *KTable) add(remoteNode *node.RemoteNode) {
 	}
 }
 
-func (t *KTable) peekNodes() []*node.RemoteNode {
+func (t *KTable) PeekNodes() []*node.RemoteNode {
 	remotes := make([]*node.RemoteNode, 0)
 	for _, bucket := range t.buckets {
 		node := bucket.Peek()
@@ -95,6 +96,10 @@ func (t *KTable) peekNodes() []*node.RemoteNode {
 		}
 	}
 	return remotes
+}
+
+func (t *KTable) GetLocalNode() *node.LocalNode {
+	return t.localNode
 }
 
 func (t *KTable) offline(nodeID string) {
@@ -180,6 +185,7 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 		},
 	}
 	t.send(rnode, utils.DiagramToBytes(ping))
+	pingTime[id] = time.Now()
 	t.addWaitReply(ping.ID, ping.Timestamp, ping.Expire, rnode)
 	logger.Trace("send ping to %v:%v", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
 }
@@ -329,7 +335,8 @@ func (t *KTable) callback(params models.CallbackParams) {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram, params.RemoteAddr)
 	case KTABLE_DIAGRAM_PONG:
-		logger.Trace("recieve pong from %v:%v", params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
+		logger.Trace("recieve pong from %v:%v - delay: %v", params.RemoteAddr.IP.String(), params.RemoteAddr.Port, time.Since(pingTime[params.Diagram.ID]))
+		delete(pingTime, params.Diagram.ID)
 		t.pongAction(params.Data)
 	case KTABLE_DIAGRAM_FINDNODE:
 		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)
@@ -381,7 +388,7 @@ func (t *KTable) loopTimeout() {
 
 func (t *KTable) loopPing() {
 	for {
-		nodes := t.peekNodes()
+		nodes := t.PeekNodes()
 		if len(nodes) == 0 {
 			t.loadInitNodes()
 		}
@@ -395,7 +402,7 @@ func (t *KTable) loopPing() {
 func (t *KTable) loopFindNode() {
 	time.Sleep(12 * time.Second)
 	for {
-		nodes := t.peekNodes()
+		nodes := t.PeekNodes()
 		for _, rnode := range nodes {
 			t.findNode(rnode)
 		}
