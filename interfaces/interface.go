@@ -11,6 +11,7 @@ type INetwork interface {
 	RemoveCallback(category string)
 	RegisterCallback(category string, callback func(models.CallbackParams))
 	Send(ip net.IP, port int, bytes []byte)
+	Start()
 }
 
 type INodeProvider interface {

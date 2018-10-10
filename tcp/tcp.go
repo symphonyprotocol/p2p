@@ -14,23 +14,32 @@ import (
 var tcpLogger = log.GetLogger("tcp")
 
 type TCPConnection struct {
-	*net.TCPConn
+	net.Conn
 	stop			chan struct{} 
 	isInbound		bool
 }
 
-func NewTCPConnection(conn *net.TCPConn, isInbound bool) *TCPConnection {
+func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
 	return &TCPConnection {
-		TCPConn		:	conn,
+		Conn		:	conn,
 		isInbound	:	isInbound,
 		stop		:	make(chan struct{}),
 	}
 }
 
+type ITCPDialer interface {
+	DialRemoteServer(ip net.IP, port int) (net.Conn, error)
+}
+
+type TCPDialer struct {
+}
+
 type TCPService struct {
 	interfaces.INetwork
-	listener		*net.TCPListener
+	listener		net.Listener
 	connections		sync.Map				// map[string] *net.TCPConn	// string(ip.To16())	net.IP(ipStr)
+
+	tcpDialer		ITCPDialer
 
 	localNodeId		string
 	ip 				net.IP
@@ -44,6 +53,7 @@ func NewTCPService(localNodeId string, ip net.IP, port int) *TCPService {
 		localNodeId	:	localNodeId,
 		ip			:	ip,
 		port		:	port,
+		tcpDialer	: 	&TCPDialer{},
 	}
 
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{ IP: ip, Port: port })
@@ -63,7 +73,7 @@ func (tcp *TCPService) getConnectionKey(ip net.IP, port int) string {
 func (tcp *TCPService) loop() {
 	tcpLogger.Trace("Start listening TCP connections...")
 	for {
-		conn, err := tcp.listener.AcceptTCP()
+		conn, err := tcp.listener.Accept()
 		if err != nil {
 			panic(err)
 		}
@@ -143,10 +153,8 @@ func (tcp *TCPService) getConnection(ip net.IP, port int) (*TCPConnection, error
 
 	// 2. create new connection
 	// localIP := &net.TCPAddr{ IP: tcp.ip, Port: tcp.port }
-	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
-	conn, err := net.DialTCP("tcp", nil, remoteIP)
+	conn, err := tcp.tcpDialer.DialRemoteServer(ip, port)
 	if err != nil {
-		tcpLogger.Trace("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err
 	}
 
@@ -200,4 +208,15 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
 
 func (tcp *TCPService) Start() {
 	go tcp.loop()
+}
+
+func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
+	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
+	conn, err := net.DialTCP("tcp", nil, remoteIP)
+	if err != nil {
+		tcpLogger.Trace("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)
+		return nil, err
+	}
+
+	return conn, nil
 }

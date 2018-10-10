@@ -7,13 +7,14 @@ import (
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/udp"
 	"github.com/symphonyprotocol/p2p/tcp"
+	"github.com/symphonyprotocol/p2p/interfaces"
 )
 
 type P2PServer struct {
 	node       *node.LocalNode
 	ktable     *kad.KTable
 	udpService *udp.UDPService
-	tcpService *tcp.TCPService
+	tcpService interfaces.INetwork
 	syncManager	*tcp.SyncManager
 	quit       chan int
 }
@@ -21,14 +22,14 @@ type P2PServer struct {
 func NewP2PServer() *P2PServer {
 	node := node.NewLocalNode()
 	udpService := udp.NewUDPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
-	tcpService := tcp.NewTCPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
+	sTcpService := tcp.NewSecuredTCPService(node)
 	ktable := kad.NewKTable(node, udpService)
-	syncManager := tcp.NewSyncManager(ktable, tcpService, tcp.NewFileSyncProvider())
+	syncManager := tcp.NewSyncManager(ktable, sTcpService, tcp.NewFileSyncProvider())
 	srv := &P2PServer{
 		node:       node,
 		ktable:     ktable,
 		udpService: udpService,
-		tcpService: tcpService,
+		tcpService: sTcpService,
 		quit:       make(chan int),
 		syncManager: syncManager,
 	}

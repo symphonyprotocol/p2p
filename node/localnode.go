@@ -22,6 +22,11 @@ type Interface interface {
 	RefreshNode(ip string, port int)
 }
 
+type ILocalNode interface {
+	Interface
+	GetPrivateKey() *ecdsa.PrivateKey
+}
+
 type Node struct {
 	id         []byte
 	localIP    net.IP
@@ -165,4 +170,8 @@ func (n *LocalNode) DiscoverNAT() {
 			}
 		}
 	}
+}
+
+func (ln *LocalNode) GetPrivateKey() *ecdsa.PrivateKey {
+	return ln.privKey
 }

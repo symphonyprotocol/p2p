@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	logger = log.GetLogger("SyncManager")
+	smLogger = log.GetLogger("SyncManager")
 )
 
 // SyncManager
@@ -38,7 +38,7 @@ func (s *SyncManager) syncLoop() {
 		// loop through the nodes.
 		nodes := s.nodeProvider.PeekNodes()
 		for _, n := range nodes {
-			logger.Trace("Trying to sync from peer: %v", n.GetID())
+			smLogger.Trace("Trying to sync from peer: %v", n.GetID())
 			isSuccess := s.syncProvider.SendSyncRequest(s.network, n)
 			if isSuccess {
 				break
