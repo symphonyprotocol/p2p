@@ -31,6 +31,6 @@ func NewFileSyncProvider() *FileSyncProvider {
 }
 
 func (f *FileSyncProvider) SendSyncRequest(network interfaces.INetwork, n *node.RemoteNode) bool {
-	network.Send(n.GetRemoteIP(), n.GetRemotePort(), utils.DiagramToBytes(newFileSyncDiagram()))
+	network.Send(n.GetRemoteIP(), n.GetRemotePort(), utils.DiagramToBytes(newFileSyncDiagram()), n.GetID())
 	return true
 }

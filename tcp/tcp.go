@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"github.com/symphonyprotocol/p2p/node"
 	"fmt"
 	"sync"
 	"net"
@@ -17,6 +18,7 @@ type TCPConnection struct {
 	net.Conn
 	stop			chan struct{} 
 	isInbound		bool
+	nodeId			string		// to be filled when confirmed.
 }
 
 func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
@@ -48,15 +50,15 @@ type TCPService struct {
 	callbacks		sync.Map
 }
 
-func NewTCPService(localNodeId string, ip net.IP, port int) *TCPService {
+func NewTCPService(localNode *node.LocalNode) *TCPService {
 	service := &TCPService {
-		localNodeId	:	localNodeId,
-		ip			:	ip,
-		port		:	port,
+		localNodeId	:	localNode.GetID(),
+		ip			:	localNode.GetLocalIP(),
+		port		:	localNode.GetLocalPort(),
 		tcpDialer	: 	&TCPDialer{},
 	}
 
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{ IP: ip, Port: port })
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{ IP: service.ip, Port: service.port })
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +82,7 @@ func (tcp *TCPService) loop() {
 		remoteAddr := conn.RemoteAddr()
 		tcpAddr, err := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
 		if err != nil {
-			tcpLogger.Trace("Failed to parse remote addr from the new tcp connection")
+			tcpLogger.Error("Failed to parse remote addr from the new tcp connection")
 		}
 		the_key := tcp.getConnectionKey(tcpAddr.IP, tcpAddr.Port)
 		// 1. check if connection in map
@@ -92,13 +94,14 @@ func (tcp *TCPService) loop() {
 			}
 		} 
 		// 2. accept this connection
+		tcpLogger.Trace("Accepting incoming connection with key: %v", the_key)
 		the_conn := NewTCPConnection(conn, true)
 		tcp.connections.Store(the_key, the_conn)
-		go tcp.handleConnection(the_conn)
+		go tcp.handleConnection(the_conn, the_key)
 	}
 }
 
-func (tcp *TCPService) handleConnection(conn *TCPConnection) {
+func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 	for {
 		// check if we need to close this conn
 		quit := false
@@ -110,7 +113,7 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection) {
 			data := make([]byte, 1280)
 			n, err := conn.Read(data)
 			if err != nil {
-				tcpLogger.Trace("conn: read: %s", err)
+				tcpLogger.Error("conn: read: %s", err)
 				quit = true
 			} else {
 
@@ -136,20 +139,42 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection) {
 			// 2. close this connection
 			conn.Close()
 			// 3. remove from map
-			//tcp.connections.Delete(key)
+			tcp.connections.Delete(key)
 			break
 		}
 	}
 }
 
-func (tcp *TCPService) getConnection(ip net.IP, port int) (*TCPConnection, error) {
+func (tcp *TCPService) getConnection(ip net.IP, port int, nodeId string) (*TCPConnection, error) {
 	the_key := tcp.getConnectionKey(ip, port)
 	// 1. check if connection in map
 	if _conn, ok := tcp.connections.Load(the_key); ok {
 		if conn, ok := _conn.(*TCPConnection); ok {
+			tcpLogger.Trace("connection %v is in the map, isInbound: %v", the_key, conn.isInbound)
 			return conn, nil
 		}
 	} 
+
+	var the_conn *TCPConnection = nil
+
+	tcp.connections.Range(func (k interface{}, v interface{}) bool {
+		if conn, ok := v.(*TCPConnection); ok {
+			if conn.nodeId == nodeId {
+				// boom
+				tcpLogger.Trace("connection %v is in the map, but found by its nodeId, isInbound: %v", the_key, conn.isInbound)
+				the_conn = conn
+				return false
+			}
+		} else {
+			return false
+		}
+
+		return true
+	})
+
+	if the_conn != nil {
+		return the_conn, nil
+	}
 
 	// 2. create new connection
 	// localIP := &net.TCPAddr{ IP: tcp.ip, Port: tcp.port }
@@ -159,11 +184,11 @@ func (tcp *TCPService) getConnection(ip net.IP, port int) (*TCPConnection, error
 	}
 
 	// 3. add connection to map
-	the_conn := NewTCPConnection(conn, false)
+	the_conn = NewTCPConnection(conn, false)
 	tcp.connections.Store(the_key, the_conn)
 
 	// 4. start connection listener
-	go tcp.handleConnection(the_conn)
+	go tcp.handleConnection(the_conn, the_key)
 
 	return the_conn, nil
 }
@@ -178,7 +203,7 @@ func (tcp *TCPService) closeConnection(ip net.IP, port int) {
 		}
 	}
 
-	tcpLogger.Trace("Failed to close connection %v", key)
+	tcpLogger.Warn("Failed to close connection %v", key)
 }
 
 func (c *TCPService) RegisterCallback(category string, callback func(models.CallbackParams)) {
@@ -189,10 +214,10 @@ func (c *TCPService) RemoveCallback(category string) {
 	c.callbacks.Delete(category)
 }
 
-func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
-	conn, err := c.getConnection(ip, port)
+func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
+	conn, err := c.getConnection(ip, port, nodeId)
 	if err != nil {
-		tcpLogger.Trace("Failed to send packet (%d) to %v:%v", len(bytes), ip.String(), port)
+		tcpLogger.Error("Failed to send packet (%d) to %v:%v", len(bytes), ip.String(), port)
 		return
 	}
 
@@ -200,7 +225,7 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte) {
 	// TODO: encryption (can be done by tls on tcp connection?)
 	length, err := conn.Write(bytes)
 	if err != nil {
-		tcpLogger.Trace("Failed to send packet (%d) to %v:%v", length, ip.String(), port)
+		tcpLogger.Error("Failed to send packet (%d) to %v:%v", length, ip.String(), port)
 	} else {
 		tcpLogger.Trace("Packet (%d) sent to %v:%v", length, ip.String(), port)
 	}
@@ -214,7 +239,7 @@ func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
 	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
 	conn, err := net.DialTCP("tcp", nil, remoteIP)
 	if err != nil {
-		tcpLogger.Trace("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)
+		tcpLogger.Error("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err
 	}
 

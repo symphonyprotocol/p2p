@@ -163,7 +163,7 @@ func (t *KTable) addWaitReply(msgID string, sendTs int64, expireTs int64, rnode 
 
 func (t *KTable) send(rnode *node.RemoteNode, data []byte) {
 	ip, port := rnode.GetSendIPWithPort(t.localNode)
-	t.network.Send(ip, port, data)
+	t.network.Send(ip, port, data, rnode.GetID())
 }
 
 func (t *KTable) ping(rnode *node.RemoteNode) {
@@ -272,7 +272,7 @@ func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int
 		},
 		Nodes: nodeDiagrams,
 	}
-	t.network.Send(ip, port, utils.DiagramToBytes(resp))
+	t.network.Send(ip, port, utils.DiagramToBytes(resp), nodeID)
 	logger.Trace("echo find node resp to %v:%v", ip.String(), port)
 }
 

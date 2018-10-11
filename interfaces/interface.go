@@ -10,7 +10,7 @@ import (
 type INetwork interface {
 	RemoveCallback(category string)
 	RegisterCallback(category string, callback func(models.CallbackParams))
-	Send(ip net.IP, port int, bytes []byte)
+	Send(ip net.IP, port int, bytes []byte, nodeId string)
 	Start()
 }
 

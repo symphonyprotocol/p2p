@@ -37,11 +37,12 @@ func (s *SyncManager) syncLoop() {
 	for {
 		// loop through the nodes.
 		nodes := s.nodeProvider.PeekNodes()
+		smLogger.Trace("Peek peers got: %v", len(nodes))
 		for _, n := range nodes {
 			smLogger.Trace("Trying to sync from peer: %v", n.GetID())
 			isSuccess := s.syncProvider.SendSyncRequest(s.network, n)
 			if isSuccess {
-				break
+				// break
 			}
 		}
 		time.Sleep(5000 * time.Millisecond)

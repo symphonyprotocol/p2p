@@ -55,7 +55,7 @@ func (tcp *SecuredTCPService) genCert(pri *ecdsa.PrivateKey) string {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			Organization: []string{"Docker, Inc."},
+			Organization: []string{"SymphonyProtocol"},
 		},
 		NotBefore: time.Now().Add(-time.Hour * 24 * 365),
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
@@ -84,7 +84,7 @@ func (tcp *SecuredTCPService) genPriv(pri *ecdsa.PrivateKey) string {
 }
 
 func (tcp *SecuredTCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
-	conn, err := tls.Dial("tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{ InsecureSkipVerify: true })
+	conn, err := tls.DialWithDialer(&net.Dialer{ KeepAlive: time.Minute }, "tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{ InsecureSkipVerify: true })
 	if err != nil {
 		sTcpLogger.Error("Failed to open secured tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err
