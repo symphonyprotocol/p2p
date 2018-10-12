@@ -113,7 +113,7 @@ func (t *KTable) offline(nodeID string) {
 	}
 }
 
-func (t *KTable) refresh(nodeID string, localIP string, localPort int, remoteIP string, remotePort int) {
+func (t *KTable) refresh(nodeID string, localIP string, localPort int, remoteIP string, remotePort int, latency int) {
 	if nodeID == t.localNode.GetID() {
 		return
 	}
@@ -125,7 +125,7 @@ func (t *KTable) refresh(nodeID string, localIP string, localPort int, remoteIP 
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
 			//logger.Trace("refresh exist node：%v, %v, %v", remoteIP, remotePort, dist)
-			rnode.RefreshNode(localIP, localPort, remoteIP, remotePort)
+			rnode.RefreshNode(localIP, localPort, remoteIP, remotePort, latency)
 			bucket.MoveToTail(rnode)
 		} else {
 			//logger.Trace("refresh to add new node: %v, %v, %v", remoteIP, remotePort, dist)
@@ -317,7 +317,7 @@ func (t *KTable) findNodeResp(data []byte) {
 	var resp FindNodeRespDiagram
 	utils.BytesToUDPDiagram(data, &resp)
 	for _, n := range resp.Nodes {
-		t.refresh(n.NodeID, n.LocalAddr, n.LocalPort, n.RemoteIP, n.RemotePort)
+		t.refresh(n.NodeID, n.LocalAddr, n.LocalPort, n.RemoteIP, n.RemotePort, -1)
 	}
 	logger.Trace("recieve find node resp")
 }
@@ -330,13 +330,18 @@ func (t *KTable) callback(params models.CallbackParams) {
 			return
 		}
 	}
-	t.refresh(params.Diagram.NodeID, params.Diagram.LocalAddr, params.Diagram.LocalPort, params.RemoteAddr.IP.String(), params.RemoteAddr.Port)
+
+	latency := -1
+	if params.Diagram.DType == KTABLE_DIAGRAM_PONG {
+		latency = int(time.Since(pingTime[params.Diagram.ID]) / time.Millisecond)
+		logger.Trace("recieve pong from %v:%v - latency: %vms", params.RemoteAddr.IP.String(), params.RemoteAddr.Port, latency)
+		delete(pingTime, params.Diagram.ID)
+	}
+	t.refresh(params.Diagram.NodeID, params.Diagram.LocalAddr, params.Diagram.LocalPort, params.RemoteAddr.IP.String(), params.RemoteAddr.Port, latency)
 	switch params.Diagram.DType {
 	case KTABLE_DIAGRAM_PING:
 		t.pong(params.Diagram, params.RemoteAddr)
 	case KTABLE_DIAGRAM_PONG:
-		logger.Trace("recieve pong from %v:%v - delay: %v", params.RemoteAddr.IP.String(), params.RemoteAddr.Port, time.Since(pingTime[params.Diagram.ID]))
-		delete(pingTime, params.Diagram.ID)
 		t.pongAction(params.Data)
 	case KTABLE_DIAGRAM_FINDNODE:
 		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)

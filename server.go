@@ -12,8 +12,8 @@ import (
 
 type P2PServer struct {
 	node       *node.LocalNode
-	ktable     *kad.KTable
-	udpService *udp.UDPService
+	ktable     interfaces.INodeProvider
+	udpService interfaces.INetwork
 	tcpService interfaces.INetwork
 	syncManager	*tcp.SyncManager
 	quit       chan int
@@ -22,7 +22,7 @@ type P2PServer struct {
 func NewP2PServer() *P2PServer {
 	node := node.NewLocalNode()
 	udpService := udp.NewUDPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
-	sTcpService := tcp.NewTCPService(node)
+	sTcpService := tcp.NewSecuredTCPService(node)
 	ktable := kad.NewKTable(node, udpService)
 	syncManager := tcp.NewSyncManager(ktable, sTcpService, tcp.NewFileSyncProvider())
 	srv := &P2PServer{

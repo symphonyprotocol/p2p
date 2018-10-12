@@ -17,6 +17,19 @@ var (
 		]
 	}`)
 
+// var (
+// 	staticNodeList = []byte(`
+// 	{
+// 		"nodes":
+// 		[
+// 			{
+// 				"id": "e9fa8677cdff28ccc9a0f27d74b032e62deba74c5adc05b394a90182e596726d",
+// 				"ip":"10.106.53.150",
+// 				"port": 32768
+// 			}
+// 		]
+// 	}`)
+
 	DEFAULT_UDP_PORT = 32768
 	DEFAULT_TCP_PORT = 32768
 	DEFAULT_NET_WORK = "MINOR"

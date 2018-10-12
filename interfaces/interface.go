@@ -17,8 +17,9 @@ type INetwork interface {
 type INodeProvider interface {
 	PeekNodes() []*node.RemoteNode
 	GetLocalNode() *node.LocalNode 
+	Start()
 }
 
 type ISyncProvider interface {
-	SendSyncRequest(network INetwork, remoteNode *node.RemoteNode) bool
+	SendSyncRequest(network INetwork, localNode *node.LocalNode, remoteNode *node.RemoteNode) bool
 }

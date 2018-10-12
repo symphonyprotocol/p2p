@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"time"
 	"github.com/symphonyprotocol/p2p/interfaces"
 	"github.com/symphonyprotocol/p2p/utils"
 	"github.com/symphonyprotocol/p2p/models"
@@ -13,10 +14,12 @@ type fileSyncDiagram struct {
 	models.TCPDiagram
 }
 
-func newFileSyncDiagram() fileSyncDiagram {
+func newFileSyncDiagram(ln *node.LocalNode) fileSyncDiagram {
 	return fileSyncDiagram{
 		models.TCPDiagram{
 			DCategory: "shit",
+			NodeID: ln.GetID(),
+			Timestamp: time.Now().Unix(),
 		},
 	}
 }
@@ -30,7 +33,7 @@ func NewFileSyncProvider() *FileSyncProvider {
 	}
 }
 
-func (f *FileSyncProvider) SendSyncRequest(network interfaces.INetwork, n *node.RemoteNode) bool {
-	network.Send(n.GetRemoteIP(), n.GetRemotePort(), utils.DiagramToBytes(newFileSyncDiagram()), n.GetID())
+func (f *FileSyncProvider) SendSyncRequest(network interfaces.INetwork, ln *node.LocalNode, n *node.RemoteNode) bool {
+	network.Send(n.GetRemoteIP(), n.GetRemotePort(), utils.DiagramToBytes(newFileSyncDiagram(ln)), n.GetID())
 	return true
 }

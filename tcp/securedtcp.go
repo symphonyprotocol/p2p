@@ -84,7 +84,7 @@ func (tcp *SecuredTCPService) genPriv(pri *ecdsa.PrivateKey) string {
 }
 
 func (tcp *SecuredTCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
-	conn, err := tls.DialWithDialer(&net.Dialer{ KeepAlive: time.Minute }, "tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{ InsecureSkipVerify: true })
+	conn, err := tls.DialWithDialer(&net.Dialer{ KeepAlive: time.Minute, Timeout: 30 * time.Second }, "tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{ InsecureSkipVerify: true })
 	if err != nil {
 		sTcpLogger.Error("Failed to open secured tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err

@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"crypto/tls"
 	"github.com/symphonyprotocol/p2p/node"
 	"fmt"
 	"sync"
@@ -123,6 +124,9 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 				rdata := data[:n]
 				var diagram models.TCPDiagram
 				utils.BytesToUDPDiagram(rdata, &diagram)
+
+				// update nodeID for the connection.
+				conn.nodeId = diagram.NodeID
 				if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
 					callback := obj.(func(models.TCPCallbackParams))
 					callback(models.TCPCallbackParams{
@@ -151,17 +155,21 @@ func (tcp *TCPService) getConnection(ip net.IP, port int, nodeId string) (*TCPCo
 	if _conn, ok := tcp.connections.Load(the_key); ok {
 		if conn, ok := _conn.(*TCPConnection); ok {
 			tcpLogger.Trace("connection %v is in the map, isInbound: %v", the_key, conn.isInbound)
+			if sConn, ok := conn.Conn.(*tls.Conn); ok {
+				tcpLogger.Trace("this is a secured connection, tls version: 0x%x, cipher: 0x%x", sConn.ConnectionState().Version, sConn.ConnectionState().CipherSuite)
+			}
 			return conn, nil
 		}
 	} 
 
+	// 1.1 check if the connection can only be found by nodeId, this is probably an inbound connection.
 	var the_conn *TCPConnection = nil
 
 	tcp.connections.Range(func (k interface{}, v interface{}) bool {
 		if conn, ok := v.(*TCPConnection); ok {
 			if conn.nodeId == nodeId {
-				// boom
-				tcpLogger.Trace("connection %v is in the map, but found by its nodeId, isInbound: %v", the_key, conn.isInbound)
+				// got this connection
+				tcpLogger.Trace("connection %v is in the map, but found by its nodeId, real address is %v, isInbound: %v", the_key, conn.RemoteAddr().String(), conn.isInbound)
 				the_conn = conn
 				return false
 			}
