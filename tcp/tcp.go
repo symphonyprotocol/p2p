@@ -2,14 +2,14 @@ package tcp
 
 import (
 	"crypto/tls"
-	"github.com/symphonyprotocol/p2p/node"
 	"fmt"
-	"sync"
 	"net"
+	"sync"
+
 	"github.com/symphonyprotocol/log"
+	"github.com/symphonyprotocol/p2p/node"
 
 	"github.com/symphonyprotocol/p2p/models"
-	"github.com/symphonyprotocol/p2p/interfaces"
 	"github.com/symphonyprotocol/p2p/utils"
 )
 
@@ -17,16 +17,39 @@ var tcpLogger = log.GetLogger("tcp")
 
 type TCPConnection struct {
 	net.Conn
-	stop			chan struct{} 
-	isInbound		bool
-	nodeId			string		// to be filled when confirmed.
+	stop      chan struct{}
+	isInbound bool
+	nodeId    string // to be filled when confirmed.
+}
+
+type TCPCallbackParams struct {
+	models.CallbackParams
+	Connection *TCPConnection
+}
+
+func (u TCPCallbackParams) GetTCPRemoteAddr() *net.TCPAddr {
+	if addr, ok := u.RemoteAddr.(*net.TCPAddr); ok {
+		return addr
+	}
+
+	return nil
+}
+
+func (u TCPCallbackParams) GetTCPDiagram() models.TCPDiagram {
+	if diag, ok := u.Diagram.(models.TCPDiagram); ok {
+		return diag
+	}
+
+	// error
+
+	return models.TCPDiagram{}
 }
 
 func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
-	return &TCPConnection {
-		Conn		:	conn,
-		isInbound	:	isInbound,
-		stop		:	make(chan struct{}),
+	return &TCPConnection{
+		Conn:      conn,
+		isInbound: isInbound,
+		stop:      make(chan struct{}),
 	}
 }
 
@@ -38,28 +61,28 @@ type TCPDialer struct {
 }
 
 type TCPService struct {
-	interfaces.INetwork
-	listener		net.Listener
-	connections		sync.Map				// map[string] *net.TCPConn	// string(ip.To16())	net.IP(ipStr)
+	models.INetwork
+	listener    net.Listener
+	connections sync.Map // map[string] *net.TCPConn	// string(ip.To16())	net.IP(ipStr)
 
-	tcpDialer		ITCPDialer
+	tcpDialer ITCPDialer
 
-	localNodeId		string
-	ip 				net.IP
-	port			int
+	localNodeId string
+	ip          net.IP
+	port        int
 
-	callbacks		sync.Map
+	callbacks sync.Map
 }
 
 func NewTCPService(localNode *node.LocalNode) *TCPService {
-	service := &TCPService {
-		localNodeId	:	localNode.GetID(),
-		ip			:	localNode.GetLocalIP(),
-		port		:	localNode.GetLocalPort(),
-		tcpDialer	: 	&TCPDialer{},
+	service := &TCPService{
+		localNodeId: localNode.GetID(),
+		ip:          localNode.GetLocalIP(),
+		port:        localNode.GetLocalPort(),
+		tcpDialer:   &TCPDialer{},
 	}
 
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{ IP: service.ip, Port: service.port })
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: service.ip, Port: service.port})
 	if err != nil {
 		panic(err)
 	}
@@ -93,7 +116,7 @@ func (tcp *TCPService) loop() {
 				conn.Close()
 				continue
 			}
-		} 
+		}
 		// 2. accept this connection
 		tcpLogger.Trace("Accepting incoming connection with key: %v", the_key)
 		the_conn := NewTCPConnection(conn, true)
@@ -107,7 +130,7 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 		// check if we need to close this conn
 		quit := false
 		select {
-		case <- conn.stop:
+		case <-conn.stop:
 			quit = true
 		default:
 			// keep reading from conn
@@ -128,11 +151,14 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 				// update nodeID for the connection.
 				conn.nodeId = diagram.NodeID
 				if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
-					callback := obj.(func(models.TCPCallbackParams))
-					callback(models.TCPCallbackParams{
-						RemoteAddr: tcpAddr,
-						Diagram:    diagram,
-						Data:       rdata,
+					callback := obj.(func(TCPCallbackParams))
+					callback(TCPCallbackParams{
+						CallbackParams: models.CallbackParams{
+							RemoteAddr: tcpAddr,
+							Diagram:    diagram,
+							Data:       rdata,
+						},
+						Connection: conn,
 					})
 				}
 			}
@@ -160,12 +186,12 @@ func (tcp *TCPService) getConnection(ip net.IP, port int, nodeId string) (*TCPCo
 			}
 			return conn, nil
 		}
-	} 
+	}
 
 	// 1.1 check if the connection can only be found by nodeId, this is probably an inbound connection.
 	var the_conn *TCPConnection = nil
 
-	tcp.connections.Range(func (k interface{}, v interface{}) bool {
+	tcp.connections.Range(func(k interface{}, v interface{}) bool {
 		if conn, ok := v.(*TCPConnection); ok {
 			if conn.nodeId == nodeId {
 				// got this connection
@@ -214,7 +240,7 @@ func (tcp *TCPService) closeConnection(ip net.IP, port int) {
 	tcpLogger.Warn("Failed to close connection %v", key)
 }
 
-func (c *TCPService) RegisterCallback(category string, callback func(models.CallbackParams)) {
+func (c *TCPService) RegisterCallback(category string, callback func(models.ICallbackParams)) {
 	c.callbacks.Store(category, callback)
 }
 
@@ -244,7 +270,7 @@ func (tcp *TCPService) Start() {
 }
 
 func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
-	remoteIP := &net.TCPAddr{ IP: ip, Port: port }
+	remoteIP := &net.TCPAddr{IP: ip, Port: port}
 	conn, err := net.DialTCP("tcp", nil, remoteIP)
 	if err != nil {
 		tcpLogger.Error("Failed to open tcp connection to %v:%v, error: %v", ip.String(), port, err)

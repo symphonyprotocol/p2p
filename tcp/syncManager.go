@@ -2,8 +2,9 @@ package tcp
 
 import (
 	"time"
-	"github.com/symphonyprotocol/p2p/interfaces"
+
 	"github.com/symphonyprotocol/log"
+	"github.com/symphonyprotocol/p2p/models"
 )
 
 var (
@@ -13,18 +14,18 @@ var (
 // SyncManager
 // what to sync? block? file? config? rawdata?
 // how to sync? from closer nodes? from every nodes? from those who has the content?
-// sync details? blockid? filehash? 
+// sync details? blockid? filehash?
 type SyncManager struct {
 	// get the available nodes.
-	nodeProvider	interfaces.INodeProvider
+	nodeProvider models.INodeProvider
 	// the network service
-	network			interfaces.INetwork
+	network models.INetwork
 	// what to sync
-	syncProvider	interfaces.ISyncProvider
+	syncProvider models.ISyncProvider
 }
 
-func NewSyncManager(nodeProvider interfaces.INodeProvider, network interfaces.INetwork, syncProvider interfaces.ISyncProvider) *SyncManager {
-	return &SyncManager {
+func NewSyncManager(nodeProvider models.INodeProvider, network models.INetwork, syncProvider models.ISyncProvider) *SyncManager {
+	return &SyncManager{
 		nodeProvider, network, syncProvider,
 	}
 }

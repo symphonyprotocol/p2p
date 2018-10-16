@@ -34,7 +34,7 @@ func NewUDPService(localNodeID string, ip net.IP, port int) *UDPService {
 	return client
 }
 
-func (c *UDPService) RegisterCallback(category string, callback func(models.CallbackParams)) {
+func (c *UDPService) RegisterCallback(category string, callback func(models.ICallbackParams)) {
 	c.callbacks.Store(category, callback)
 }
 

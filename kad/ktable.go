@@ -12,7 +12,6 @@ import (
 	"github.com/symphonyprotocol/p2p/models"
 
 	"github.com/symphonyprotocol/p2p/config"
-	"github.com/symphonyprotocol/p2p/interfaces"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/utils"
 )
@@ -38,13 +37,13 @@ type waitReply struct {
 }
 
 type KTable struct {
-	network   interfaces.INetwork
+	network   models.INetwork
 	localNode *node.LocalNode
 	buckets   map[int]*KBucket
 	waitlist  sync.Map
 }
 
-func NewKTable(localNode *node.LocalNode, network interfaces.INetwork) *KTable {
+func NewKTable(localNode *node.LocalNode, network models.INetwork) *KTable {
 	buckets := make(map[int]*KBucket)
 	kt := &KTable{
 		network:   network,
@@ -173,12 +172,14 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 	exprie := ts + int64(models.DEFAULT_TIMEOUT)
 	ping := PingDiagram{
 		UDPDiagram: models.UDPDiagram{
-			ID:        id,
-			NodeID:    t.localNode.GetID(),
-			Timestamp: ts,
-			DCategory: KTABLE_DIAGRAM_CATEGORY,
-			DType:     KTABLE_DIAGRAM_PING,
-			Version:   models.UDP_DIAGRAM_VERSION,
+			NetworkDiagram: models.NetworkDiagram{
+				ID:        id,
+				NodeID:    t.localNode.GetID(),
+				Timestamp: ts,
+				DCategory: KTABLE_DIAGRAM_CATEGORY,
+				DType:     KTABLE_DIAGRAM_PING,
+				Version:   models.UDP_DIAGRAM_VERSION,
+			},
 			Expire:    exprie,
 			LocalAddr: t.localNode.GetLocalIP().String(),
 			LocalPort: t.localNode.GetLocalPort(),
@@ -203,12 +204,14 @@ func (t *KTable) pong(diagram models.UDPDiagram, remoteAddr *net.UDPAddr) {
 	expire := ts + int64(models.DEFAULT_TIMEOUT)
 	pong := PongDiagram{
 		UDPDiagram: models.UDPDiagram{
-			ID:        diagram.ID,
-			NodeID:    t.localNode.GetID(),
-			DCategory: KTABLE_DIAGRAM_CATEGORY,
-			DType:     KTABLE_DIAGRAM_PONG,
-			Version:   models.UDP_DIAGRAM_VERSION,
-			Timestamp: ts,
+			NetworkDiagram: models.NetworkDiagram{
+				ID:        diagram.ID,
+				NodeID:    t.localNode.GetID(),
+				DCategory: KTABLE_DIAGRAM_CATEGORY,
+				DType:     KTABLE_DIAGRAM_PONG,
+				Version:   models.UDP_DIAGRAM_VERSION,
+				Timestamp: ts,
+			},
 			Expire:    expire,
 			LocalAddr: t.localNode.GetLocalIP().String(),
 			LocalPort: t.localNode.GetLocalPort(),
@@ -227,12 +230,14 @@ func (t *KTable) findNode(rnode *node.RemoteNode) {
 	exprie := ts + int64(models.DEFAULT_TIMEOUT)
 	fn := FindNodeDiagram{
 		UDPDiagram: models.UDPDiagram{
-			ID:        id,
-			NodeID:    t.localNode.GetID(),
-			Timestamp: ts,
-			DCategory: KTABLE_DIAGRAM_CATEGORY,
-			DType:     KTABLE_DIAGRAM_FINDNODE,
-			Version:   models.UDP_DIAGRAM_VERSION,
+			NetworkDiagram: models.NetworkDiagram{
+				ID:        id,
+				NodeID:    t.localNode.GetID(),
+				Timestamp: ts,
+				DCategory: KTABLE_DIAGRAM_CATEGORY,
+				DType:     KTABLE_DIAGRAM_FINDNODE,
+				Version:   models.UDP_DIAGRAM_VERSION,
+			},
 			Expire:    exprie,
 			LocalAddr: t.localNode.GetLocalIP().String(),
 			LocalPort: t.localNode.GetLocalPort(),
@@ -260,12 +265,14 @@ func (t *KTable) findNodeAction(msgID string, nodeID string, ip net.IP, port int
 	exprie := ts + int64(models.DEFAULT_TIMEOUT)
 	resp := FindNodeRespDiagram{
 		UDPDiagram: models.UDPDiagram{
-			ID:        msgID,
-			NodeID:    t.localNode.GetID(),
-			Timestamp: ts,
-			DCategory: KTABLE_DIAGRAM_CATEGORY,
-			DType:     KTABLE_DIAGRAM_FINDNODERESP,
-			Version:   models.UDP_DIAGRAM_VERSION,
+			NetworkDiagram: models.NetworkDiagram{
+				ID:        msgID,
+				NodeID:    t.localNode.GetID(),
+				Timestamp: ts,
+				DCategory: KTABLE_DIAGRAM_CATEGORY,
+				DType:     KTABLE_DIAGRAM_FINDNODERESP,
+				Version:   models.UDP_DIAGRAM_VERSION,
+			},
 			Expire:    exprie,
 			LocalAddr: t.localNode.GetLocalIP().String(),
 			LocalPort: t.localNode.GetLocalPort(),
@@ -322,32 +329,34 @@ func (t *KTable) findNodeResp(data []byte) {
 	logger.Trace("recieve find node resp")
 }
 
-func (t *KTable) callback(params models.CallbackParams) {
-	if obj, ok := t.waitlist.Load(params.Diagram.ID); ok {
-		wait := obj.(waitReply)
-		t.waitlist.Delete(wait.MesageID)
-		if wait.IsTimeout {
-			return
+func (t *KTable) callback(p models.ICallbackParams) {
+	if params, ok := p.(models.UDPCallbackParam); ok {
+		if obj, ok := t.waitlist.Load(params.Diagram.GetID()); ok {
+			wait := obj.(waitReply)
+			t.waitlist.Delete(wait.MesageID)
+			if wait.IsTimeout {
+				return
+			}
 		}
-	}
-
-	latency := -1
-	if params.Diagram.DType == KTABLE_DIAGRAM_PONG {
-		latency = int(time.Since(pingTime[params.Diagram.ID]) / time.Millisecond)
-		logger.Trace("recieve pong from %v:%v - latency: %vms", params.RemoteAddr.IP.String(), params.RemoteAddr.Port, latency)
-		delete(pingTime, params.Diagram.ID)
-	}
-	t.refresh(params.Diagram.NodeID, params.Diagram.LocalAddr, params.Diagram.LocalPort, params.RemoteAddr.IP.String(), params.RemoteAddr.Port, latency)
-	switch params.Diagram.DType {
-	case KTABLE_DIAGRAM_PING:
-		t.pong(params.Diagram, params.RemoteAddr)
-	case KTABLE_DIAGRAM_PONG:
-		t.pongAction(params.Data)
-	case KTABLE_DIAGRAM_FINDNODE:
-		t.findNodeAction(params.Diagram.ID, params.Diagram.NodeID, params.RemoteAddr.IP, params.RemoteAddr.Port)
-	case KTABLE_DIAGRAM_FINDNODERESP:
-		t.findNodeResp(params.Data)
-	default:
+	
+		latency := -1
+		if params.Diagram.GetDType() == KTABLE_DIAGRAM_PONG {
+			latency = int(time.Since(pingTime[params.Diagram.GetID()]) / time.Millisecond)
+			logger.Trace("recieve pong from %v:%v - latency: %vms", params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
+			delete(pingTime, params.Diagram.GetID())
+		}
+		t.refresh(params.Diagram.GetNodeID(), params.GetUDPDiagram().LocalAddr, params.GetUDPDiagram().LocalPort, params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
+		switch params.Diagram.GetDType() {
+		case KTABLE_DIAGRAM_PING:
+			t.pong(params.GetUDPDiagram(), params.GetUDPRemoteAddr())
+		case KTABLE_DIAGRAM_PONG:
+			t.pongAction(params.Data)
+		case KTABLE_DIAGRAM_FINDNODE:
+			t.findNodeAction(params.Diagram.GetID(), params.Diagram.GetNodeID(), params.GetUDPRemoteAddr().IP, params.GetUDPRemoteAddr().Port)
+		case KTABLE_DIAGRAM_FINDNODERESP:
+			t.findNodeResp(params.Data)
+		default:
+		}
 	}
 }
 
