@@ -34,6 +34,7 @@ func initialKtable() {
 
 func initialServer() {
 	srv := p2p.NewP2PServer()
+	srv.Use(&p2p.BlockSyncMiddleware{})
 	srv.Start()
 
 	// try to dial to each other

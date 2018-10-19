@@ -330,7 +330,7 @@ func (t *KTable) findNodeResp(data []byte) {
 }
 
 func (t *KTable) callback(p models.ICallbackParams) {
-	if params, ok := p.(models.UDPCallbackParam); ok {
+	if params, ok := p.(models.UDPCallbackParams); ok {
 		if obj, ok := t.waitlist.Load(params.Diagram.GetID()); ok {
 			wait := obj.(waitReply)
 			t.waitlist.Delete(wait.MesageID)

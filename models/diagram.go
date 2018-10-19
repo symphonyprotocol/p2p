@@ -39,7 +39,7 @@ type CallbackParams struct {
 	Data       []byte
 }
 
-type UDPCallbackParam struct {
+type UDPCallbackParams struct {
 	CallbackParams
 }
 
@@ -47,7 +47,7 @@ func (c CallbackParams) GetRemoteAddr() net.Addr { return c.RemoteAddr }
 func (c CallbackParams) GetDiagram() IDiagram { return c.Diagram }
 func (c CallbackParams) GetData() []byte { return c.Data }
 
-func (u UDPCallbackParam) GetUDPRemoteAddr() *net.UDPAddr {
+func (u UDPCallbackParams) GetUDPRemoteAddr() *net.UDPAddr {
 	if addr, ok := u.RemoteAddr.(*net.UDPAddr); ok {
 		return addr
 	}
@@ -55,7 +55,7 @@ func (u UDPCallbackParam) GetUDPRemoteAddr() *net.UDPAddr {
 	return nil
 }
 
-func (u UDPCallbackParam) GetUDPDiagram() UDPDiagram {
+func (u UDPCallbackParams) GetUDPDiagram() UDPDiagram {
 	if diag, ok := u.Diagram.(UDPDiagram); ok {
 		return diag
 	}

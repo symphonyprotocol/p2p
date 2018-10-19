@@ -22,6 +22,9 @@ type TCPConnection struct {
 	nodeId    string // to be filled when confirmed.
 }
 
+func (t TCPConnection) GetIsInBound() bool { return t.isInbound }
+func (t TCPConnection) GetNodeID() string { return t.nodeId }
+
 type TCPCallbackParams struct {
 	models.CallbackParams
 	Connection *TCPConnection
@@ -72,6 +75,8 @@ type TCPService struct {
 	port        int
 
 	callbacks sync.Map
+	newConnectionHander	func(*TCPConnection)
+	connectionDroppedHandler	func(*TCPConnection)
 }
 
 func NewTCPService(localNode *node.LocalNode) *TCPService {
@@ -121,6 +126,9 @@ func (tcp *TCPService) loop() {
 		tcpLogger.Trace("Accepting incoming connection with key: %v", the_key)
 		the_conn := NewTCPConnection(conn, true)
 		tcp.connections.Store(the_key, the_conn)
+		if tcp.newConnectionHander != nil {
+			tcp.newConnectionHander(the_conn)
+		}
 		go tcp.handleConnection(the_conn, the_key)
 	}
 }
@@ -151,7 +159,7 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 				// update nodeID for the connection.
 				conn.nodeId = diagram.NodeID
 				if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
-					callback := obj.(func(TCPCallbackParams))
+					callback := obj.(func(models.ICallbackParams))
 					callback(TCPCallbackParams{
 						CallbackParams: models.CallbackParams{
 							RemoteAddr: tcpAddr,
@@ -168,6 +176,9 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 			tcpLogger.Trace("TCP Connection to %v quit by signal", conn.RemoteAddr().String())
 			// 2. close this connection
 			conn.Close()
+			if tcp.connectionDroppedHandler != nil {
+				tcp.connectionDroppedHandler(conn)
+			}
 			// 3. remove from map
 			tcp.connections.Delete(key)
 			break
@@ -278,4 +289,16 @@ func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+func (tcp *TCPService) RegisterAcceptConnectionEvent(f func (*TCPConnection)) {
+	if f != nil {
+		tcp.newConnectionHander = f
+	}
+}
+
+func (tcp *TCPService) RegisterDropConnectionEvent(f func (*TCPConnection)) {
+	if f != nil {
+		tcp.connectionDroppedHandler = f
+	}
 }

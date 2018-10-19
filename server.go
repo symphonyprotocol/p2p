@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"github.com/symphonyprotocol/log"
 	"fmt"
 
 	"github.com/symphonyprotocol/p2p/models"
@@ -9,13 +10,16 @@ import (
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/tcp"
 	"github.com/symphonyprotocol/p2p/udp"
+	
 )
+
+var p2pLogger = log.GetLogger("p2pServer")
 
 type P2PServer struct {
 	node        *node.LocalNode
 	ktable      models.INodeProvider
 	udpService  models.INetwork
-	tcpService  models.INetwork
+	tcpService  *tcp.SecuredTCPService
 	syncManager *tcp.SyncManager
 	middlewares []tcp.IMiddleware
 	quit        chan int
@@ -34,7 +38,7 @@ func NewP2PServer() *P2PServer {
 		tcpService:  sTcpService,
 		quit:        make(chan int),
 		syncManager: syncManager,
-		middlewares: make([]tcp.IMiddleware, 10),
+		middlewares: make([]tcp.IMiddleware, 0, 10),
 	}
 	return srv
 }
@@ -44,9 +48,19 @@ func (s *P2PServer) Start() {
 	fmt.Println(s.node)
 	s.udpService.Start()
 	s.tcpService.Start()
+	s.regTCPEvents()
+	s.startMiddlewares()
+	s.ktable.Start()
+	// s.syncManager.Start()
+	defer close(s.quit)
+	<-s.quit
+}
+
+func (s *P2PServer) regTCPEvents() {
 	s.tcpService.RegisterCallback("default", func(p models.ICallbackParams) {
 		if params, ok := p.(tcp.TCPCallbackParams); ok {
-			ctx := tcp.NewP2PContext(s.tcpService, s.node, params.Connection)
+			ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, &params)
+			// p2pLogger.Debug("Length of middlewares is %v", len(s.middlewares))
 			for _, middleware := range s.middlewares {
 				middleware.Handle(ctx)
 				if ctx.GetSkipped() {
@@ -56,18 +70,34 @@ func (s *P2PServer) Start() {
 			}
 		}
 	})
-	s.ktable.Start()
-	s.syncManager.Start()
-	defer close(s.quit)
-	<-s.quit
+
+	s.tcpService.RegisterAcceptConnectionEvent(func (conn *tcp.TCPConnection) {
+		for _, middleware := range s.middlewares {
+			middleware.AcceptConnection(conn)
+		}
+	})
+
+	s.tcpService.RegisterDropConnectionEvent(func (conn *tcp.TCPConnection) {
+		for _, middleware := range s.middlewares {
+			middleware.DropConnection(conn)
+		}
+	})
 }
 
+func (s *P2PServer) startMiddlewares() {
+	ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil)
+	for _, middleware := range s.middlewares {
+		middleware.Start(ctx)
+	}
+}
+
+// use before start
 func (s *P2PServer) Use(m tcp.IMiddleware) {
 	s.middlewares = append(s.middlewares, m)
 }
 
-func (s *P2PServer) Broadcast() {
-	
+// NodeID will be set by P2PServer
+func (s *P2PServer) Broadcast(diagram models.TCPDiagram) {
 }
 
 func (s *P2PServer) Close() {

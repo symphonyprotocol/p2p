@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"github.com/symphonyprotocol/p2p/utils"
 	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/models"
@@ -12,24 +13,34 @@ type P2PContext struct {
 	_skipped    bool
 	_network    models.INetwork
 	_localNode  *node.LocalNode
-	_connection *TCPConnection
+	_nodeProvider	models.INodeProvider
+	_params 	*TCPCallbackParams
 }
 
-func NewP2PContext(network models.INetwork, localNode *node.LocalNode, conn *TCPConnection) *P2PContext {
+func NewP2PContext(network models.INetwork, localNode *node.LocalNode, nodeProvider models.INodeProvider, params *TCPCallbackParams) *P2PContext {
 	return &P2PContext{
 		_skipped:    false,
 		_network:    network,
 		_localNode:  localNode,
-		_connection: conn,
+		_nodeProvider:	nodeProvider,
+		_params:	 params,
 	}
 }
 
-func (ctx *P2PContext) Send(bytes []byte) {
-	length, err := ctx._connection.Write(bytes)
+func (ctx *P2PContext) Send(diag models.IDiagram) {
+	length, err := ctx._params.Connection.Write(utils.DiagramToBytes(diag))
 	if err != nil {
-		p2pLogger.Error("Failed to send packet (%d) to %v", length, ctx._connection.RemoteAddr().String())
+		p2pLogger.Error("Failed to send packet (%d) to %v", length, ctx._params.Connection.RemoteAddr().String())
 	} else {
-		p2pLogger.Trace("Packet (%d) sent to %v", length, ctx._connection.RemoteAddr().String())
+		p2pLogger.Trace("Packet (%d) sent to %v", length, ctx._params.Connection.RemoteAddr().String())
+	}
+}
+
+func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
+	peers := ctx._nodeProvider.PeekNodes()
+	for _, peer := range peers {
+		p2pLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
+		ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), utils.DiagramToBytes(diag), peer.GetID())
 	}
 }
 
@@ -44,8 +55,8 @@ func (ctx *P2PContext) LocalNode() *node.LocalNode {
 	return ctx._localNode
 }
 
-func (ctx *P2PContext) Connection() *TCPConnection {
-	return ctx._connection
+func (ctx *P2PContext) Params() *TCPCallbackParams {
+	return ctx._params
 }
 
 func (ctx *P2PContext) GetSkipped() bool {
@@ -58,4 +69,7 @@ func (ctx *P2PContext) ResetSkipped() {
 
 type IMiddleware interface {
 	Handle(*P2PContext)
+	Start(*P2PContext)
+	AcceptConnection(*TCPConnection)
+	DropConnection(*TCPConnection)
 }

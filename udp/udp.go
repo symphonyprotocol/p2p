@@ -59,11 +59,13 @@ func (c *UDPService) loop() {
 		var diagram models.UDPDiagram
 		utils.BytesToUDPDiagram(rdata, &diagram)
 		if obj, ok := c.callbacks.Load(diagram.DCategory); ok {
-			callback := obj.(func(models.CallbackParams))
-			callback(models.CallbackParams{
-				RemoteAddr: remoteAddr,
-				Diagram:    diagram,
-				Data:       rdata,
+			callback := obj.(func(models.ICallbackParams))
+			callback(models.UDPCallbackParams{
+				CallbackParams: models.CallbackParams{
+					RemoteAddr: remoteAddr,
+					Diagram:    diagram,
+					Data:       rdata,
+				},
 			})
 		}
 	}
