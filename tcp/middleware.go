@@ -55,6 +55,10 @@ func (ctx *P2PContext) LocalNode() *node.LocalNode {
 	return ctx._localNode
 }
 
+func (ctx *P2PContext) NodeProvider() models.INodeProvider {
+	return ctx._nodeProvider
+}
+
 func (ctx *P2PContext) Params() *TCPCallbackParams {
 	return ctx._params
 }
@@ -65,6 +69,11 @@ func (ctx *P2PContext) GetSkipped() bool {
 
 func (ctx *P2PContext) ResetSkipped() {
 	ctx._skipped = false
+}
+
+// Get the diagram as input 
+func (ctx *P2PContext) GetDiagram(diagRef interface{}) {
+	utils.BytesToUDPDiagram(ctx.Params().Data, diagRef)
 }
 
 type IMiddleware interface {

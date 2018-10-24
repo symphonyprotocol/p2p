@@ -4,6 +4,7 @@ import (
 	//"crypto/ecdsa"
 
 	"net"
+	"time"
 
 	symen "github.com/symphonyprotocol/p2p/encrypt"
 )
@@ -12,6 +13,7 @@ type RemoteNode struct {
 	Node
 	Distance int
 	Latency int
+	LastActiveTime	time.Time
 }
 
 func (r *RemoteNode) RefreshNode(localIP string, localPort int, remoteIP string, remotePort int, latency int) {
@@ -22,6 +24,7 @@ func (r *RemoteNode) RefreshNode(localIP string, localPort int, remoteIP string,
 	if latency > 0 {
 		r.Latency = latency
 	}
+	r.LastActiveTime = time.Now()
 }
 
 func (r *RemoteNode) SetPublicKey(keyStr string) {

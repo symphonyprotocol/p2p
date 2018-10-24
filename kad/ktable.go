@@ -20,7 +20,8 @@ var (
 	//BUCKETS_TOTAL = 256
 	BUCKETS_SIZE = 8
 	logger = log.GetLogger("ktable")
-	pingTime = make(map[string]time.Time)
+	pingTime 			sync.Map
+	pingExpectedNodeIds	sync.Map
 )
 
 type RecieveData struct {
@@ -102,7 +103,7 @@ func (t *KTable) GetLocalNode() *node.LocalNode {
 }
 
 func (t *KTable) offline(nodeID string) {
-	logger.Trace("node offline %v", nodeID)
+	logger.Debug("node offline %v", nodeID)
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
 	if bucket, ok := t.buckets[dist]; ok {
@@ -119,7 +120,7 @@ func (t *KTable) refresh(nodeID string, localIP string, localPort int, remoteIP 
 
 	id, _ := hex.DecodeString(nodeID)
 	dist := distance(t.localNode.GetIDBytes(), id)
-	logger.Trace("refresh exist node：%v:%v -> %v:%v, %v", localIP, localPort, remoteIP, remotePort, dist)
+	logger.Trace("refresh exist node %v：%v:%v -> %v:%v, %v", nodeID, localIP, localPort, remoteIP, remotePort, dist)
 	if bucket, ok := t.buckets[dist]; ok {
 		rnode := bucket.Search(nodeID)
 		if rnode != nil {
@@ -186,7 +187,8 @@ func (t *KTable) ping(rnode *node.RemoteNode) {
 		},
 	}
 	t.send(rnode, utils.DiagramToBytes(ping))
-	pingTime[id] = time.Now()
+	pingTime.Store(id, time.Now())
+	pingExpectedNodeIds.Store(id, rnode.GetID())
 	t.addWaitReply(ping.ID, ping.Timestamp, ping.Expire, rnode)
 	logger.Trace("send ping to %v:%v", rnode.GetRemoteIP().String(), rnode.GetRemotePort())
 }
@@ -341,10 +343,19 @@ func (t *KTable) callback(p models.ICallbackParams) {
 	
 		latency := -1
 		if params.Diagram.GetDType() == KTABLE_DIAGRAM_PONG {
-			latency = int(time.Since(pingTime[params.Diagram.GetID()]) / time.Millisecond)
-			logger.Trace("recieve pong from %v:%v - latency: %vms", params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
-			delete(pingTime, params.Diagram.GetID())
+			if lastTime, ok := pingTime.Load(params.Diagram.GetID()); ok {
+				latency = int(time.Since(lastTime.(time.Time)) / time.Millisecond)
+				logger.Info("recieve pong from %v, %v:%v - latency: %vms", params.GetUDPDiagram().GetNodeID(), params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
+				pingTime.Delete(params.Diagram.GetID())
+			}
+
+			if expectedNodeId, ok := pingExpectedNodeIds.Load(params.Diagram.GetID()); ok && expectedNodeId != params.GetUDPDiagram().GetNodeID() {
+				// boom
+				logger.Warn("The node %v is obsolete, remove it", expectedNodeId)
+				t.offline(expectedNodeId.(string))
+			}
 		}
+		logger.Debug("recieved %v from node %v", params.Diagram.GetDType(), params.GetUDPDiagram().GetNodeID())
 		t.refresh(params.Diagram.GetNodeID(), params.GetUDPDiagram().LocalAddr, params.GetUDPDiagram().LocalPort, params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
 		switch params.Diagram.GetDType() {
 		case KTABLE_DIAGRAM_PING:
@@ -420,7 +431,7 @@ func (t *KTable) loopFindNode() {
 		for _, rnode := range nodes {
 			t.findNode(rnode)
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }
 

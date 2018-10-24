@@ -11,6 +11,7 @@ import (
 
 	"github.com/symphonyprotocol/p2p/models"
 	"github.com/symphonyprotocol/p2p/utils"
+	"time"
 )
 
 var tcpLogger = log.GetLogger("tcp")
@@ -20,10 +21,12 @@ type TCPConnection struct {
 	stop      chan struct{}
 	isInbound bool
 	nodeId    string // to be filled when confirmed.
+	lastActiveTime	time.Time
 }
 
 func (t TCPConnection) GetIsInBound() bool { return t.isInbound }
 func (t TCPConnection) GetNodeID() string { return t.nodeId }
+func (t TCPConnection) GetLastActiveTime() time.Time { return t.lastActiveTime }
 
 type TCPCallbackParams struct {
 	models.CallbackParams
@@ -53,6 +56,7 @@ func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
 		Conn:      conn,
 		isInbound: isInbound,
 		stop:      make(chan struct{}),
+		lastActiveTime:	time.Now(),
 	}
 }
 
@@ -133,6 +137,33 @@ func (tcp *TCPService) loop() {
 	}
 }
 
+func (tcp *TCPService) loopCleanUpConnections() {
+	for {
+		time.Sleep(time.Minute * 2)
+		tcpLogger.Debug("Going to clean up the connections")
+		keysToBeRemoved := make([]interface{}, 0, 0)
+		tcp.connections.Range(func(k interface{}, v interface{}) bool {
+			if conn, ok := v.(*TCPConnection); ok {
+				tcpLogger.Debug("Comparing lastActiveTime: %v", conn.lastActiveTime)
+				if int64(time.Since(conn.lastActiveTime)) > int64(time.Minute * 2) {
+					tcpLogger.Warn("Conn %v marked to be removed because of IDLE", k)
+					keysToBeRemoved = append(keysToBeRemoved, k)
+				}
+			}
+
+			return true
+		})
+
+		for _, k := range keysToBeRemoved {
+			tcpLogger.Debug("Removing connection by key: %v because of IDLE", k)
+			_conn, _ := tcp.connections.Load(k)
+			conn := _conn.(*TCPConnection)
+			conn.Close()
+			tcp.connections.Delete(k)
+		}
+	}
+}
+
 func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 	for {
 		// check if we need to close this conn
@@ -158,6 +189,7 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 
 				// update nodeID for the connection.
 				conn.nodeId = diagram.NodeID
+				conn.lastActiveTime = time.Now()
 				if obj, ok := tcp.callbacks.Load(diagram.DCategory); ok {
 					callback := obj.(func(models.ICallbackParams))
 					callback(TCPCallbackParams{
@@ -278,6 +310,7 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 
 func (tcp *TCPService) Start() {
 	go tcp.loop()
+	go tcp.loopCleanUpConnections()
 }
 
 func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
@@ -301,4 +334,22 @@ func (tcp *TCPService) RegisterDropConnectionEvent(f func (*TCPConnection)) {
 	if f != nil {
 		tcp.connectionDroppedHandler = f
 	}
+}
+
+func (tcp *TCPService) GetTCPConnections() []*TCPConnection {
+	res := make([]*TCPConnection, 0, 0)
+	tcpLogger.Debug("Getting TCP Connections to public")
+	if tcp != nil {
+		tcp.connections.Range(func(k interface{}, v interface{}) bool {
+			if conn, ok := v.(*TCPConnection); ok {
+				// tcpLogger.Debug("appending tcp connections")
+				res = append(res, conn)
+			}
+			return true
+		})
+	} else {
+		tcpLogger.Warn("No tcp instance???")
+	}
+
+	return res
 }

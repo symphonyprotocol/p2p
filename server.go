@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"github.com/symphonyprotocol/log"
-	"fmt"
 
 	"github.com/symphonyprotocol/p2p/models"
 
@@ -45,12 +44,12 @@ func NewP2PServer() *P2PServer {
 
 func (s *P2PServer) Start() {
 	s.node.DiscoverNAT()
-	fmt.Println(s.node)
+	p2pLogger.Debug("%v", s.node)
 	s.udpService.Start()
 	s.tcpService.Start()
 	s.regTCPEvents()
-	s.startMiddlewares()
 	s.ktable.Start()
+	s.startMiddlewares()
 	// s.syncManager.Start()
 	defer close(s.quit)
 	<-s.quit
@@ -65,6 +64,7 @@ func (s *P2PServer) regTCPEvents() {
 				middleware.Handle(ctx)
 				if ctx.GetSkipped() {
 					ctx.ResetSkipped()
+				} else {
 					break
 				}
 			}

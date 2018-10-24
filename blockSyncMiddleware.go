@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"github.com/symphonyprotocol/p2p/utils"
+	"math/big"
 	"time"
 	"math/rand"
 	"github.com/symphonyprotocol/p2p/models"
@@ -11,21 +11,23 @@ import (
 
 var syncLogger = log.GetLogger("example - syncLogger")
 
+var BlockHeight	*big.Int
 
 type BlockSyncMiddleware struct {
-	blockHeight	int
 }
 
 func (b *BlockSyncMiddleware) Start(p *tcp.P2PContext) {
 	rand.Seed(time.Now().Unix())
-	b.blockHeight = rand.Intn(50)
+	BlockHeight = big.NewInt(rand.Int63n(50))
 	go func() {
 		// randomly increase the block height
 		for {
 			time.Sleep(time.Duration(rand.Intn(50000)) * time.Millisecond + 50)
-			r := rand.Intn(50)
-			syncLogger.Debug("My Block Height increased by %v from %v", r, b.blockHeight)
-			b.blockHeight = b.blockHeight + r
+			r := rand.Int63n(50)
+			added := big.NewInt(0)
+			added.Add(BlockHeight, big.NewInt(r))
+			syncLogger.Debug("My Block Height increased %v -> %v", BlockHeight, added)
+			BlockHeight = added
 		}
 	}()
 
@@ -38,7 +40,7 @@ func (b *BlockSyncMiddleware) Start(p *tcp.P2PContext) {
 			tDiag.DType = "/inv"
 			p.Broadcast(InvDiagram{
 				TCPDiagram: tDiag,
-				MyBlockHeight: b.blockHeight,
+				MyBlockHeight: BlockHeight,
 			})
 		}
 	}()
@@ -46,22 +48,22 @@ func (b *BlockSyncMiddleware) Start(p *tcp.P2PContext) {
 
 type InvDiagram struct {
 	models.TCPDiagram
-	MyBlockHeight	int
+	MyBlockHeight	*big.Int
 }
 
 type GetBlockDiagram struct {
 	models.TCPDiagram
-	TargetBlockHeight	int
-	CurrentBlockHeight	int
+	TargetBlockHeight	*big.Int
+	CurrentBlockHeight	*big.Int
 }
 
 func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 	diag := ctx.Params().GetDiagram()
 	if (diag.GetDType() == "/inv") {
 		var invDiag InvDiagram
-		utils.BytesToUDPDiagram(ctx.Params().Data, &invDiag)
+		ctx.GetDiagram(&invDiag)
 		if invDiag.ID != "" {
-			syncLogger.Debug("We got a good inv diag with height: %v, my current height is: %v", invDiag.MyBlockHeight, b.blockHeight)
+			syncLogger.Debug("We got a good inv diag with height: %v, my current height is: %v", invDiag.MyBlockHeight, BlockHeight)
 
 			// send back the block height
 			tDiag := models.NewTCPDiagram()
@@ -69,7 +71,7 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 			tDiag.DType = "/inv_res"
 			diag := InvDiagram{
 				TCPDiagram: tDiag,
-				MyBlockHeight: b.blockHeight,
+				MyBlockHeight: BlockHeight,
 			}
 			ctx.Send(diag)
 		} else {
@@ -79,19 +81,19 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/inv_res") {
 		var invDiag InvDiagram
-		utils.BytesToUDPDiagram(ctx.Params().Data, &invDiag)
+		ctx.GetDiagram(&invDiag)
 		if invDiag.ID != "" {
 			// good
-			if invDiag.MyBlockHeight > b.blockHeight {
+			if invDiag.MyBlockHeight.Cmp(BlockHeight) > 0 {
 				// remote is newer. ask for block
-				syncLogger.Debug("Remote blocks %v are newer than us %v, will ask for blocks from %v", invDiag.MyBlockHeight, b.blockHeight, ctx.Params().Connection.GetNodeID())
+				syncLogger.Debug("Remote blocks %v are newer than us %v, will ask for blocks from %v", invDiag.MyBlockHeight, BlockHeight, ctx.Params().Connection.GetNodeID())
 				tDiag := models.NewTCPDiagram()
 				tDiag.NodeID = ctx.LocalNode().GetID()
 				tDiag.DType = "/getblock"
 				diag := GetBlockDiagram{
 					TCPDiagram: tDiag,
 					TargetBlockHeight: invDiag.MyBlockHeight,
-					CurrentBlockHeight: b.blockHeight,
+					CurrentBlockHeight: BlockHeight,
 				}
 				ctx.Send(diag)
 			}
@@ -100,17 +102,17 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/getblock") {
 		var getBDiag GetBlockDiagram
-		utils.BytesToUDPDiagram(ctx.Params().Data, &getBDiag)
+		ctx.GetDiagram(&getBDiag)
 		if getBDiag.ID != "" {
-			syncLogger.Debug("We got a good getblock diag with target height: %v and its current height: %v, my current height is: %v", getBDiag.TargetBlockHeight, getBDiag.CurrentBlockHeight, b.blockHeight)
+			syncLogger.Debug("We got a good getblock diag with target height: %v and its current height: %v, my current height is: %v", getBDiag.TargetBlockHeight, getBDiag.CurrentBlockHeight, BlockHeight)
 			
 			tDiag := models.NewTCPDiagram()
 			tDiag.NodeID = ctx.LocalNode().GetID()
 			tDiag.DType = "/getblock_res"
 			diag := GetBlockDiagram{
 				TCPDiagram: tDiag,
-				TargetBlockHeight: b.blockHeight,
-				CurrentBlockHeight: b.blockHeight,
+				TargetBlockHeight: BlockHeight,
+				CurrentBlockHeight: BlockHeight,
 			}
 			ctx.Send(diag)
 		} else {
@@ -120,15 +122,17 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/getblock_res") {
 		var getBDiag GetBlockDiagram
-		utils.BytesToUDPDiagram(ctx.Params().Data, &getBDiag)
+		ctx.GetDiagram(&getBDiag)
 		if getBDiag.ID != "" {
-			if (getBDiag.TargetBlockHeight > b.blockHeight) {
+			if (getBDiag.TargetBlockHeight.Cmp(BlockHeight) > 0) {
 				// newer than me. update
-				syncLogger.Debug("Remote blocks are newer, will update blocks from %v to %v", b.blockHeight, getBDiag.TargetBlockHeight)
-				b.blockHeight = getBDiag.TargetBlockHeight
+				syncLogger.Debug("Remote blocks are newer, will update blocks from %v to %v", BlockHeight, getBDiag.TargetBlockHeight)
+				BlockHeight = getBDiag.TargetBlockHeight
 			}
 		}
 	}
+	
+	ctx.Next()
 }
 
 func (b *BlockSyncMiddleware) AcceptConnection(conn *tcp.TCPConnection) {
