@@ -1,22 +1,21 @@
 package p2p
 
 import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	ui "github.com/strawhatboy/termui"
 	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/tcp"
-	ui "github.com/strawhatboy/termui"
-	"time"
-	"fmt"
-	"strconv"
-	"sort"
-	"strings"
 )
 
 var dmLogger = log.GetLogger("dashboard")
 
 type DashboardMiddleware struct {
-
 }
-
 
 func (d *DashboardMiddleware) Handle(ctx *tcp.P2PContext) {
 	ctx.Next()
@@ -63,18 +62,18 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 		for range ticker.C {
 			uptime := d.upTime(startTime)
 			udpPeers := ctx.NodeProvider().PeekNodes()
-			tcpService, _ := ctx.Network().(*tcp.SecuredTCPService)
+			tcpService, _ := ctx.Network().(*tcp.TLSSecuredTCPService)
 			tcpConns := tcpService.GetTCPConnections()
 
 			dmLogger.Debug("Got peers: %v and conns: %v", len(udpPeers), len(tcpConns))
 
 			ls.Rows = [][]string{
-				[]string { "Id:", localNode.GetID() },
-				[]string { "PubKey:", localNode.GetPublicKey() },
-				[]string { "Local Address:", fmt.Sprintf("%v:%v", localNode.GetLocalIP().String(), localNode.GetLocalPort()) },
-				[]string { "Remote Address:", fmt.Sprintf("%v:%v", localNode.GetRemoteIP().String(), localNode.GetRemotePort()) },
-				[]string { "Up time:", fmt.Sprintf("%v", uptime) },
-				[]string { "Block Height:", fmt.Sprintf("%v", BlockHeight) },
+				[]string{"Id:", localNode.GetID()},
+				[]string{"PubKey:", localNode.GetPublicKey()},
+				[]string{"Local Address:", fmt.Sprintf("%v:%v", localNode.GetLocalIP().String(), localNode.GetLocalPort())},
+				[]string{"Remote Address:", fmt.Sprintf("%v:%v", localNode.GetRemoteIP().String(), localNode.GetRemotePort())},
+				[]string{"Up time:", fmt.Sprintf("%v", uptime)},
+				[]string{"Block Height:", fmt.Sprintf("%v", BlockHeight)},
 			}
 
 			ls.Height = len(ls.Rows) + 2
@@ -82,14 +81,13 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 			ls.SetSize()
 			//ls.Align()
 
-			tUdpPeers.Rows = [][]string{
-			}
+			tUdpPeers.Rows = [][]string{}
 
 			for _, peer := range udpPeers {
 				tUdpPeers.Rows = append(tUdpPeers.Rows, []string{
-					" ", 
-					peer.GetID(), 
-					fmt.Sprintf("%v:%v", peer.GetRemoteIP().String(), peer.GetRemotePort()), 
+					" ",
+					peer.GetID(),
+					fmt.Sprintf("%v:%v", peer.GetRemoteIP().String(), peer.GetRemotePort()),
 					strconv.Itoa(peer.Latency),
 					fmt.Sprintf("%v", peer.LastActiveTime),
 				})
@@ -101,7 +99,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 				return strings.Compare(tUdpPeers.Rows[i][1], tUdpPeers.Rows[j][1]) < 0
 			})
 
-			tUdpPeers.Rows = append([][]string{[]string{ "", "Id", "RemoteAddr", "Latency(ms)", "LastActiveTime"}}, tUdpPeers.Rows...)
+			tUdpPeers.Rows = append([][]string{[]string{"", "Id", "RemoteAddr", "Latency(ms)", "LastActiveTime"}}, tUdpPeers.Rows...)
 			tUdpPeers.Analysis()
 			tUdpPeers.SetSize()
 
@@ -117,8 +115,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 			}
 			//tUdpPeers.Align()
 
-			tTcpConns.Rows = [][]string{
-			}
+			tTcpConns.Rows = [][]string{}
 
 			for _, tConn := range tcpConns {
 				tTcpConns.Rows = append(tTcpConns.Rows, []string{
@@ -136,7 +133,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 				return strings.Compare(tTcpConns.Rows[i][4], tTcpConns.Rows[j][4]) < 0
 			})
 
-			tTcpConns.Rows = append([][]string{[]string{ "", "LocalAddr", "RemoteAddr", "IsInbound", "NodeId", "LastActiveTime" }}, tTcpConns.Rows...)
+			tTcpConns.Rows = append([][]string{[]string{"", "LocalAddr", "RemoteAddr", "IsInbound", "NodeId", "LastActiveTime"}}, tTcpConns.Rows...)
 
 			tTcpConns.Height = len(tcpConns) + 3
 			tTcpConns.Analysis()
@@ -151,7 +148,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 	}()
 
 	ui.Body.Align()
-	
+
 	ui.Handle("<Resize>", func(e ui.Event) {
 		payload := e.Payload.(ui.Resize)
 		ui.Body.Width = payload.Width
@@ -159,7 +156,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 		ui.Clear()
 		ui.Render(ui.Body)
 	})
-	
+
 	ui.Handle("q", func(ui.Event) {
 		ui.StopLoop()
 		ticker.Stop()
@@ -177,4 +174,3 @@ func (d *DashboardMiddleware) DropConnection(*tcp.TCPConnection) {
 func (d *DashboardMiddleware) upTime(t time.Time) time.Duration {
 	return time.Since(t)
 }
-

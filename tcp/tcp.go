@@ -137,33 +137,6 @@ func (tcp *TCPService) loop() {
 	}
 }
 
-func (tcp *TCPService) loopCleanUpConnections() {
-	for {
-		time.Sleep(time.Minute * 2)
-		tcpLogger.Debug("Going to clean up the connections")
-		keysToBeRemoved := make([]interface{}, 0, 0)
-		tcp.connections.Range(func(k interface{}, v interface{}) bool {
-			if conn, ok := v.(*TCPConnection); ok {
-				tcpLogger.Debug("Comparing lastActiveTime: %v", conn.lastActiveTime)
-				if int64(time.Since(conn.lastActiveTime)) > int64(time.Minute * 2) {
-					tcpLogger.Warn("Conn %v marked to be removed because of IDLE", k)
-					keysToBeRemoved = append(keysToBeRemoved, k)
-				}
-			}
-
-			return true
-		})
-
-		for _, k := range keysToBeRemoved {
-			tcpLogger.Debug("Removing connection by key: %v because of IDLE", k)
-			_conn, _ := tcp.connections.Load(k)
-			conn := _conn.(*TCPConnection)
-			conn.Close()
-			tcp.connections.Delete(k)
-		}
-	}
-}
-
 func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 	for {
 		// check if we need to close this conn
@@ -174,6 +147,10 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 		default:
 			// keep reading from conn
 			data := make([]byte, 1280)
+
+			// important, client side may fail to recieve the handshake response.
+			// it would read here forever.
+			conn.SetReadDeadline(time.Now().Add(time.Minute * 2))
 			n, err := conn.Read(data)
 			if err != nil {
 				tcpLogger.Error("conn: read: %s", err)
@@ -310,7 +287,6 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 
 func (tcp *TCPService) Start() {
 	go tcp.loop()
-	go tcp.loopCleanUpConnections()
 }
 
 func (tcp *TCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {

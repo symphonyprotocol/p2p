@@ -9,7 +9,6 @@ import (
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/tcp"
 	"github.com/symphonyprotocol/p2p/udp"
-	
 )
 
 var p2pLogger = log.GetLogger("p2pServer")
@@ -18,7 +17,7 @@ type P2PServer struct {
 	node        *node.LocalNode
 	ktable      models.INodeProvider
 	udpService  models.INetwork
-	tcpService  *tcp.SecuredTCPService
+	tcpService  *tcp.TLSSecuredTCPService
 	syncManager *tcp.SyncManager
 	middlewares []tcp.IMiddleware
 	quit        chan int
@@ -27,7 +26,7 @@ type P2PServer struct {
 func NewP2PServer() *P2PServer {
 	node := node.NewLocalNode()
 	udpService := udp.NewUDPService(node.GetID(), node.GetLocalIP(), node.GetLocalPort())
-	sTcpService := tcp.NewSecuredTCPService(node)
+	sTcpService := tcp.NewTLSSecuredTCPService(node)
 	ktable := kad.NewKTable(node, udpService)
 	syncManager := tcp.NewSyncManager(ktable, sTcpService, tcp.NewFileSyncProvider())
 	srv := &P2PServer{
@@ -71,13 +70,13 @@ func (s *P2PServer) regTCPEvents() {
 		}
 	})
 
-	s.tcpService.RegisterAcceptConnectionEvent(func (conn *tcp.TCPConnection) {
+	s.tcpService.RegisterAcceptConnectionEvent(func(conn *tcp.TCPConnection) {
 		for _, middleware := range s.middlewares {
 			middleware.AcceptConnection(conn)
 		}
 	})
 
-	s.tcpService.RegisterDropConnectionEvent(func (conn *tcp.TCPConnection) {
+	s.tcpService.RegisterDropConnectionEvent(func(conn *tcp.TCPConnection) {
 		for _, middleware := range s.middlewares {
 			middleware.DropConnection(conn)
 		}

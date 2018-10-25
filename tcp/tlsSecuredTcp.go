@@ -1,39 +1,40 @@
 package tcp
 
 import (
-	"github.com/symphonyprotocol/p2p/node"
-	"crypto/tls"
-	"fmt"
-	"github.com/symphonyprotocol/log"
-	"net"
 	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"math/big"
-	"time"
-	"crypto/rand"
 	"encoding/pem"
+	"fmt"
+	"math/big"
+	"net"
+	"time"
+
+	"github.com/symphonyprotocol/log"
+	"github.com/symphonyprotocol/p2p/node"
 )
 
-var sTcpLogger = log.GetLogger("SecuredTcp")
+var sTcpLogger = log.GetLogger("TLSSecuredTcp")
 
-type SecuredTCPService struct {
+type TLSSecuredTCPService struct {
 	*TCPService
 }
 
 type SecuredTCPDialer struct {
-	TlsConfig	*tls.Config
+	TlsConfig *tls.Config
 }
 
-func NewSecuredTCPService(n *node.LocalNode) *SecuredTCPService {
+func NewTLSSecuredTCPService(n *node.LocalNode) *TLSSecuredTCPService {
 	tcpService := &TCPService{
-		localNodeId:	n.GetID(), 
-		ip: 			n.GetLocalIP(), 
-		port:			n.GetLocalPort(),
-		tcpDialer:		&SecuredTCPDialer{ },
+		localNodeId: n.GetID(),
+		ip:          n.GetLocalIP(),
+		port:        n.GetLocalPort(),
+		tcpDialer:   &SecuredTCPDialer{},
 	}
 
-	service := &SecuredTCPService{ TCPService: tcpService }
+	service := &TLSSecuredTCPService{TCPService: tcpService}
 	privKey := n.GetPrivateKey()
 	cer, err := tls.X509KeyPair([]byte(service.genCert(privKey)), []byte(service.genPriv(privKey)))
 	if err != nil {
@@ -51,7 +52,7 @@ func NewSecuredTCPService(n *node.LocalNode) *SecuredTCPService {
 	return service
 }
 
-func (tcp *SecuredTCPService) genCert(pri *ecdsa.PrivateKey) string {
+func (tcp *TLSSecuredTCPService) genCert(pri *ecdsa.PrivateKey) string {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -64,7 +65,7 @@ func (tcp *SecuredTCPService) genCert(pri *ecdsa.PrivateKey) string {
 	certDer, err := x509.CreateCertificate(
 		rand.Reader, &template, &template, pri.Public(), pri,
 	)
-	
+
 	if err != nil {
 		sTcpLogger.Fatal("Failed to create certificate: %s", err)
 	}
@@ -77,14 +78,14 @@ func (tcp *SecuredTCPService) genCert(pri *ecdsa.PrivateKey) string {
 	return string(certEncoded)
 }
 
-func (tcp *SecuredTCPService) genPriv(pri *ecdsa.PrivateKey) string {
-    x509Encoded, _ := x509.MarshalECPrivateKey(pri)
+func (tcp *TLSSecuredTCPService) genPriv(pri *ecdsa.PrivateKey) string {
+	x509Encoded, _ := x509.MarshalECPrivateKey(pri)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: x509Encoded})
 	return string(pemEncoded)
 }
 
 func (tcp *SecuredTCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, error) {
-	conn, err := tls.DialWithDialer(&net.Dialer{ KeepAlive: time.Minute, Timeout: 30 * time.Second }, "tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{ InsecureSkipVerify: true })
+	conn, err := tls.DialWithDialer(&net.Dialer{KeepAlive: time.Minute, Timeout: 30 * time.Second}, "tcp", fmt.Sprintf("%v:%v", ip.String(), port), &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		sTcpLogger.Error("Failed to open secured tcp connection to %v:%v, error: %v", ip.String(), port, err)
 		return nil, err
@@ -92,6 +93,3 @@ func (tcp *SecuredTCPDialer) DialRemoteServer(ip net.IP, port int) (net.Conn, er
 
 	return conn, nil
 }
-
-
-
