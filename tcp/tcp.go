@@ -157,12 +157,13 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 				quit = true
 			} else {
 
-				tcpLogger.Trace("conn: received: %v bytes", n)
 				remoteAddr := conn.RemoteAddr()
-				tcpAddr, _ := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddr.String())
+				remoteAddrStr := remoteAddr.String()
+				tcpAddr, _ := net.ResolveTCPAddr(remoteAddr.Network(), remoteAddrStr)
 				rdata := data[:n]
 				var diagram models.TCPDiagram
 				utils.BytesToUDPDiagram(rdata, &diagram)
+				tcpLogger.Trace("conn: received: %v bytes from %v, diagram id is: %v", n, remoteAddrStr, diagram.GetID())
 
 				// update nodeID for the connection.
 				conn.nodeId = diagram.NodeID

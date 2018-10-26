@@ -61,8 +61,8 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 	diag := ctx.Params().GetDiagram()
 	if (diag.GetDType() == "/inv") {
 		var invDiag InvDiagram
-		ctx.GetDiagram(&invDiag)
-		if invDiag.ID != "" {
+		err := ctx.GetDiagram(&invDiag)
+		if err == nil {
 			syncLogger.Debug("We got a good inv diag with height: %v, my current height is: %v", invDiag.MyBlockHeight, BlockHeight)
 
 			// send back the block height
@@ -81,8 +81,8 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/inv_res") {
 		var invDiag InvDiagram
-		ctx.GetDiagram(&invDiag)
-		if invDiag.ID != "" {
+		err := ctx.GetDiagram(&invDiag)
+		if err == nil {
 			// good
 			if invDiag.MyBlockHeight.Cmp(BlockHeight) > 0 {
 				// remote is newer. ask for block
@@ -102,8 +102,8 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/getblock") {
 		var getBDiag GetBlockDiagram
-		ctx.GetDiagram(&getBDiag)
-		if getBDiag.ID != "" {
+		err := ctx.GetDiagram(&getBDiag)
+		if err == nil {
 			syncLogger.Debug("We got a good getblock diag with target height: %v and its current height: %v, my current height is: %v", getBDiag.TargetBlockHeight, getBDiag.CurrentBlockHeight, BlockHeight)
 			
 			tDiag := models.NewTCPDiagram()
@@ -122,8 +122,8 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 
 	if (diag.GetDType() == "/getblock_res") {
 		var getBDiag GetBlockDiagram
-		ctx.GetDiagram(&getBDiag)
-		if getBDiag.ID != "" {
+		err := ctx.GetDiagram(&getBDiag)
+		if err == nil {
 			if (getBDiag.TargetBlockHeight.Cmp(BlockHeight) > 0) {
 				// newer than me. update
 				syncLogger.Debug("Remote blocks are newer, will update blocks from %v to %v", BlockHeight, getBDiag.TargetBlockHeight)

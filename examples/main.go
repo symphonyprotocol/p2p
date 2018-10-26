@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	fDashboard = flag.Bool("dashboard", true, "show dashboard in terminal instead of logs")
+	fDashboard = flag.Bool("dashboard", false, "show dashboard in terminal instead of logs")
 )
 
 func getId() []byte {
@@ -46,7 +46,7 @@ func initLogger() {
 			"default": []log.Appender{ log.NewFileAppender("./sym.p2p.log", 2000000) },
 		})
 	} else {
-		log.SetGlobalLevel(log.DEBUG)
+		log.SetGlobalLevel(log.TRACE)
 		log.Configure(map[string]([]log.Appender){
 			"default": []log.Appender{ &log.ConsoleAppender{} },
 		})
