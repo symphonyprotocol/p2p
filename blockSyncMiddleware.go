@@ -142,3 +142,27 @@ func (b *BlockSyncMiddleware) AcceptConnection(conn *tcp.TCPConnection) {
 func (b *BlockSyncMiddleware) DropConnection(conn *tcp.TCPConnection) {
 	syncLogger.Debug("dropped connection with %v", conn.GetNodeID())
 }
+
+func (b *BlockSyncMiddleware) DashboardData() interface{} {
+	return [][]string{
+		[]string{
+			"Current BlockHeight:", BlockHeight.String(),
+		},
+	}
+}
+
+func (b *BlockSyncMiddleware) DashboardType() string {
+	return "table"
+}
+
+func (b *BlockSyncMiddleware) DashboardTitle() string {
+	return "Middleware - Block Sync"
+}
+
+func (b *BlockSyncMiddleware) DashboardTableHasColumnTitles() bool {
+	return false
+}
+
+func (b *BlockSyncMiddleware) Name() string {
+	return "Block Sync"
+}

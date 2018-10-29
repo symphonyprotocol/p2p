@@ -20,15 +20,17 @@ type P2PContext struct {
 	_localNode  *node.LocalNode
 	_nodeProvider	models.INodeProvider
 	_params 	*TCPCallbackParams
+	_middlewares	[]IMiddleware
 }
 
-func NewP2PContext(network models.INetwork, localNode *node.LocalNode, nodeProvider models.INodeProvider, params *TCPCallbackParams) *P2PContext {
+func NewP2PContext(network models.INetwork, localNode *node.LocalNode, nodeProvider models.INodeProvider, params *TCPCallbackParams, middlewares []IMiddleware) *P2PContext {
 	return &P2PContext{
 		_skipped:    false,
 		_network:    network,
 		_localNode:  localNode,
 		_nodeProvider:	nodeProvider,
 		_params:	 params,
+		_middlewares: middlewares,
 	}
 }
 
@@ -102,6 +104,10 @@ func (ctx *P2PContext) NodeProvider() models.INodeProvider {
 
 func (ctx *P2PContext) Params() *TCPCallbackParams {
 	return ctx._params
+}
+
+func (ctx *P2PContext) Middlewares() []IMiddleware {
+	return ctx._middlewares
 }
 
 func (ctx *P2PContext) GetSkipped() bool {
@@ -194,8 +200,10 @@ func (ctx *P2PContext) ResolveMultipartDiagram(mDiag MultipartTCPDiagram) []byte
 }
 
 type IMiddleware interface {
+	models.IDashboardProvider
 	Handle(*P2PContext)
 	Start(*P2PContext)
 	AcceptConnection(*TCPConnection)
 	DropConnection(*TCPConnection)
+	Name() string
 }

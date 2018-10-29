@@ -57,6 +57,25 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 		),
 	)
 
+	n := 0
+	mList := make([]ui.GridBufferer, 0, 0)
+	for _, m := range ctx.Middlewares() {
+		if m.DashboardType() == "table" {
+			n++
+			t := ui.NewTable()
+			t.Border = true
+			t.BorderLabel = m.DashboardTitle()
+			t.Separator = false
+			mList = append(mList, t)
+			if n != 0 && n % 2 == 0 {
+				ui.Body.AddRows(ui.NewRow(
+					ui.NewCol(6, 0, mList[n - 2]),
+					ui.NewCol(6, 0, mList[n - 1]),
+				))
+			}
+		}
+	}
+
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		for range ticker.C {
@@ -73,7 +92,6 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 				[]string{"Local Address:", fmt.Sprintf("%v:%v", localNode.GetLocalIP().String(), localNode.GetLocalPort())},
 				[]string{"Remote Address:", fmt.Sprintf("%v:%v", localNode.GetRemoteIP().String(), localNode.GetRemotePort())},
 				[]string{"Up time:", fmt.Sprintf("%v", uptime)},
-				[]string{"Block Height:", fmt.Sprintf("%v", BlockHeight)},
 			}
 
 			ls.Height = len(ls.Rows) + 2
@@ -108,7 +126,7 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 					tUdpPeers.BgColors[n] = ui.ColorRed
 				} else if n == 0 {
 					tUdpPeers.BgColors[n] = ui.ColorWhite
-					tUdpPeers.FgColors[n] = ui.ColorBlack
+					tUdpPeers.FgColors[n] = ui.ColorBlack | ui.AttrBold
 				} else {
 					tUdpPeers.BgColors[n] = ui.ColorDefault
 				}
@@ -140,7 +158,23 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 			tTcpConns.SetSize()
 
 			tTcpConns.BgColors[0] = ui.ColorWhite
-			tTcpConns.FgColors[0] = ui.ColorBlack
+			tTcpConns.FgColors[0] = ui.ColorBlack | ui.AttrBold
+
+			n := 0
+			for _, m := range ctx.Middlewares() {
+				if m.DashboardType() == "table" {
+					data, _ := m.DashboardData().([][]string)
+					t, _ := mList[n].(*ui.Table)
+					t.Rows = data
+					t.Height = len(data) + 2
+					t.Analysis()
+					t.SetSize()
+					if len(data) > 0 && m.DashboardTableHasColumnTitles() {
+						t.FgColors[0] = ui.ColorBlack | ui.AttrBold
+					}
+					n++
+				}
+			}
 
 			ui.Body.Align()
 			ui.Render(ui.Body)
@@ -173,4 +207,27 @@ func (d *DashboardMiddleware) DropConnection(*tcp.TCPConnection) {
 
 func (d *DashboardMiddleware) upTime(t time.Time) time.Duration {
 	return time.Since(t)
+}
+
+func (b *DashboardMiddleware) DashboardData() interface{} {
+	return [][]string{
+		[]string{
+		},
+	}
+}
+
+func (b *DashboardMiddleware) DashboardType() string {
+	return "table"
+}
+
+func (b *DashboardMiddleware) DashboardTitle() string {
+	return "Middleware - Dashboard"
+}
+
+func (b *DashboardMiddleware) DashboardTableHasColumnTitles() bool {
+	return false
+}
+
+func (b *DashboardMiddleware) Name() string {
+	return "Dashboard"
 }

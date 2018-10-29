@@ -57,7 +57,7 @@ func (s *P2PServer) Start() {
 func (s *P2PServer) regTCPEvents() {
 	s.tcpService.RegisterCallback("default", func(p models.ICallbackParams) {
 		if params, ok := p.(tcp.TCPCallbackParams); ok {
-			ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, &params)
+			ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, &params, s.middlewares)
 			
 			// p2pLogger.Debug("Length of middlewares is %v", len(s.middlewares))
 			for _, middleware := range s.middlewares {
@@ -85,7 +85,7 @@ func (s *P2PServer) regTCPEvents() {
 }
 
 func (s *P2PServer) startMiddlewares() {
-	ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil)
+	ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil, s.middlewares)
 	for _, middleware := range s.middlewares {
 		middleware.Start(ctx)
 	}

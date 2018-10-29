@@ -37,3 +37,10 @@ type INodeProvider interface {
 type ISyncProvider interface {
 	SendSyncRequest(network INetwork, localNode *node.LocalNode, remoteNode *node.RemoteNode) bool
 }
+
+type IDashboardProvider interface {
+	DashboardData() interface{}	// [][]string for table, []string for list
+	DashboardType() string
+	DashboardTitle() string
+	DashboardTableHasColumnTitles() bool
+}
