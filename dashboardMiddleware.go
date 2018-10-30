@@ -76,6 +76,10 @@ func (d *DashboardMiddleware) Start(ctx *tcp.P2PContext) {
 		}
 	}
 
+	if n % 2 != 0 {
+		ui.Body.AddRows(ui.NewRow(ui.NewCol(6, 0, mList[n - 1])))
+	}
+
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		for range ticker.C {

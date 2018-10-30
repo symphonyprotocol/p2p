@@ -57,6 +57,7 @@ func initLogger() {
 func initialServer() {
 	srv := p2p.NewP2PServer()
 	srv.Use(&p2p.BlockSyncMiddleware{})
+	srv.Use(p2p.NewFileTransferMiddleware())
 	if *fDashboard {
 		// use dashboard
 		srv.Use(&p2p.DashboardMiddleware{})

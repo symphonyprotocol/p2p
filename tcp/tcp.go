@@ -196,7 +196,7 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 	}
 }
 
-func (tcp *TCPService) getConnection(ip net.IP, port int, nodeId string) (*TCPConnection, error) {
+func (tcp *TCPService) GetConnection(ip net.IP, port int, nodeId string) (*TCPConnection, error) {
 	the_key := tcp.getConnectionKey(ip, port)
 	// 1. check if connection in map
 	if _conn, ok := tcp.connections.Load(the_key); ok {
@@ -269,11 +269,11 @@ func (c *TCPService) RemoveCallback(category string) {
 	c.callbacks.Delete(category)
 }
 
-func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
-	conn, err := c.getConnection(ip, port, nodeId)
+func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) (int, error) {
+	conn, err := c.GetConnection(ip, port, nodeId)
 	if err != nil {
 		tcpLogger.Error("Failed to send packet (%d) to %v:%v", len(bytes), ip.String(), port)
-		return
+		return -1, err
 	}
 
 	// TODO: chunksize
@@ -284,6 +284,8 @@ func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 	} else {
 		tcpLogger.Trace("Packet (%d) sent to %v:%v", length, ip.String(), port)
 	}
+
+	return length, err
 }
 
 func (tcp *TCPService) Start() {

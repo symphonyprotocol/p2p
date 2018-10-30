@@ -10,7 +10,7 @@ import (
 )
 
 var mLogger = log.GetLogger("middleware")
-var TCP_CHUNK_SIZE = 20
+var TCP_CHUNK_SIZE = 800
 var multipartDiagramMap sync.Map
 var _multipartDiagramPartsMap sync.Map
 
@@ -35,6 +35,28 @@ func NewP2PContext(network models.INetwork, localNode *node.LocalNode, nodeProvi
 }
 
 func (ctx *P2PContext) Send(diag models.IDiagram) {
+	ctx.chunkDiagram(diag, func(bytes []byte)  (int, error) {
+		return ctx._params.Connection.Write(bytes)
+	})
+}
+
+func (ctx *P2PContext) NewTCPDiagram() models.TCPDiagram {
+	tDiag := models.NewTCPDiagram()
+	tDiag.NodeID = ctx.LocalNode().GetID()
+	return tDiag
+}
+
+func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
+	peers := ctx._nodeProvider.PeekNodes()
+	for _, peer := range peers {
+		mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
+		ctx.chunkDiagram(diag, func(bytes []byte) (int, error) {
+			return ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
+		})
+	}
+}
+
+func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte) (int, error)) {
 	bytes := utils.DiagramToBytes(diag)
 	lenBytes := len(bytes)
 	chunksCount := lenBytes / TCP_CHUNK_SIZE + 1
@@ -57,33 +79,21 @@ func (ctx *P2PContext) Send(diag models.IDiagram) {
 			ChunkSize: end - (i * TCP_CHUNK_SIZE),
 			ChunkTotalSize: lenBytes,
 		}
-		length, err := ctx._params.Connection.Write(utils.DiagramToBytes(mDiag))
-		if err != nil {
-			mLogger.Error("Failed to send packet (%d) to %v", length, ctx._params.Connection.RemoteAddr().String())
-		} else {
-			mLogger.Trace(
-				"Packet (%d) sent to %v with chunksCount: %v, chunkNo: %v, chunkSize: %v, chunkTotalSize: %v", 
-				length, 
-				ctx._params.Connection.RemoteAddr().String(),
-				mDiag.ChunksCount,
-				mDiag.ChunkNo,
-				mDiag.ChunkSize,
-				mDiag.ChunkTotalSize)
+		bytesDiag := utils.DiagramToBytes(mDiag)
+		if callback != nil {
+			length, err := callback(bytesDiag)
+			if err != nil {
+				mLogger.Error("Failed to send packet")
+			} else {
+				mLogger.Trace(
+					"Packet (%d) sent with chunksCount: %v, chunkNo: %v, chunkSize: %v, chunkTotalSize: %v", 
+					length, 
+					mDiag.ChunksCount,
+					mDiag.ChunkNo,
+					mDiag.ChunkSize,
+					mDiag.ChunkTotalSize)
+			}
 		}
-	}
-}
-
-func (ctx *P2PContext) NewTCPDiagram() models.TCPDiagram {
-	tDiag := models.NewTCPDiagram()
-	tDiag.NodeID = ctx.LocalNode().GetID()
-	return tDiag
-}
-
-func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
-	peers := ctx._nodeProvider.PeekNodes()
-	for _, peer := range peers {
-		mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
-		ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), utils.DiagramToBytes(diag), peer.GetID())
 	}
 }
 
@@ -185,7 +195,7 @@ func (ctx *P2PContext) ResolveMultipartDiagram(mDiag MultipartTCPDiagram) []byte
 			}
 		}
 
-		mLogger.Debug("What is in Ids now is: %v", whatIsInIds)
+		// mLogger.Debug("What is in Ids now is: %v", whatIsInIds)
 
 		if !notFinished {
 			
