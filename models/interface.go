@@ -24,7 +24,7 @@ type ICallbackParams interface {
 type INetwork interface {
 	RemoveCallback(category string)
 	RegisterCallback(category string, callback func(ICallbackParams))
-	Send(ip net.IP, port int, bytes []byte, nodeId string) (int, error) 
+	Send(ip net.IP, port int, bytes []byte, nodeId string)
 	Start()
 }
 

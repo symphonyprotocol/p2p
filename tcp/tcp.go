@@ -22,11 +22,13 @@ type TCPConnection struct {
 	isInbound bool
 	nodeId    string // to be filled when confirmed.
 	lastActiveTime	time.Time
+	writeQueue	chan []byte
 }
 
 func (t TCPConnection) GetIsInBound() bool { return t.isInbound }
 func (t TCPConnection) GetNodeID() string { return t.nodeId }
 func (t TCPConnection) GetLastActiveTime() time.Time { return t.lastActiveTime }
+func (t TCPConnection) WriteBytes(bytes []byte) { t.writeQueue <- bytes }
 
 type TCPCallbackParams struct {
 	models.CallbackParams
@@ -57,6 +59,7 @@ func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
 		isInbound: isInbound,
 		stop:      make(chan struct{}),
 		lastActiveTime:	time.Now(),
+		writeQueue: make(chan []byte),
 	}
 }
 
@@ -134,6 +137,36 @@ func (tcp *TCPService) loop() {
 			tcp.newConnectionHander(the_conn)
 		}
 		go tcp.handleConnection(the_conn, the_key)
+		go tcp.handleSendEvent(the_conn, the_key)
+	}
+}
+
+func (tcp *TCPService) handleSendEvent(conn *TCPConnection, key string) {
+
+	for {
+		quit := false
+		select {
+		case <-conn.stop:
+			quit = true
+		case bytes := <-conn.writeQueue:
+			tcpLogger.Trace("conn - going to write")
+			_, err := conn.Write(bytes)
+			if err != nil {
+				tcpLogger.Error("conn: write: %s", err)
+			}
+		}
+
+		if quit {
+			tcpLogger.Trace("TCP Connection to %v quit by signal", conn.RemoteAddr().String())
+			// 2. close this connection
+			conn.Close()
+			if tcp.connectionDroppedHandler != nil {
+				tcp.connectionDroppedHandler(conn)
+			}
+			// 3. remove from map
+			tcp.connections.Delete(key)
+			break
+		}
 	}
 }
 
@@ -142,8 +175,6 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 		// check if we need to close this conn
 		quit := false
 		select {
-		case <-conn.stop:
-			quit = true
 		default:
 			// keep reading from conn
 			data := make([]byte, 1280)
@@ -183,14 +214,8 @@ func (tcp *TCPService) handleConnection(conn *TCPConnection, key string) {
 		}
 
 		if quit {
-			tcpLogger.Trace("TCP Connection to %v quit by signal", conn.RemoteAddr().String())
-			// 2. close this connection
-			conn.Close()
-			if tcp.connectionDroppedHandler != nil {
-				tcp.connectionDroppedHandler(conn)
-			}
-			// 3. remove from map
-			tcp.connections.Delete(key)
+			// stop reading.
+			conn.stop <- struct{}{}
 			break
 		}
 	}
@@ -244,6 +269,7 @@ func (tcp *TCPService) GetConnection(ip net.IP, port int, nodeId string) (*TCPCo
 
 	// 4. start connection listener
 	go tcp.handleConnection(the_conn, the_key)
+	go tcp.handleSendEvent(the_conn, the_key)
 
 	return the_conn, nil
 }
@@ -269,23 +295,16 @@ func (c *TCPService) RemoveCallback(category string) {
 	c.callbacks.Delete(category)
 }
 
-func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) (int, error) {
+func (c *TCPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 	conn, err := c.GetConnection(ip, port, nodeId)
 	if err != nil {
 		tcpLogger.Error("Failed to send packet (%d) to %v:%v", len(bytes), ip.String(), port)
-		return -1, err
+		return
 	}
 
 	// TODO: chunksize
 	// TODO: encryption (can be done by tls on tcp connection?)
-	length, err := conn.Write(bytes)
-	if err != nil {
-		tcpLogger.Error("Failed to send packet (%d) to %v:%v", length, ip.String(), port)
-	} else {
-		tcpLogger.Trace("Packet (%d) sent to %v:%v", length, ip.String(), port)
-	}
-
-	return length, err
+	conn.WriteBytes(bytes)
 }
 
 func (tcp *TCPService) Start() {

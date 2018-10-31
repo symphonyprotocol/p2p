@@ -71,15 +71,13 @@ func (c *UDPService) loop() {
 	}
 }
 
-func (c *UDPService) Send(ip net.IP, port int, bytes []byte, nodeId string) (int, error) {
+func (c *UDPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 	dstAddr := &net.UDPAddr{IP: ip, Port: port}
 	//logger.Trace("send udp data to %v", dstAddr)
-	length, err := c.listener.WriteToUDP(bytes, dstAddr)
+	_, err := c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
 		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)
 	}
-
-	return length, err
 }
 
 func (c *UDPService) Start() {

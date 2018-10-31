@@ -10,7 +10,7 @@ import (
 )
 
 var mLogger = log.GetLogger("middleware")
-var TCP_CHUNK_SIZE = 800
+var TCP_CHUNK_SIZE = 500
 var multipartDiagramMap sync.Map
 var _multipartDiagramPartsMap sync.Map
 
@@ -35,8 +35,8 @@ func NewP2PContext(network models.INetwork, localNode *node.LocalNode, nodeProvi
 }
 
 func (ctx *P2PContext) Send(diag models.IDiagram) {
-	ctx.chunkDiagram(diag, func(bytes []byte)  (int, error) {
-		return ctx._params.Connection.Write(bytes)
+	ctx.chunkDiagram(diag, func(bytes []byte) {
+		ctx._params.Connection.WriteBytes(bytes)
 	})
 }
 
@@ -50,13 +50,13 @@ func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
 	peers := ctx._nodeProvider.PeekNodes()
 	for _, peer := range peers {
 		mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
-		ctx.chunkDiagram(diag, func(bytes []byte) (int, error) {
-			return ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
+		ctx.chunkDiagram(diag, func(bytes []byte) {
+			ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
 		})
 	}
 }
 
-func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte) (int, error)) {
+func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte)) {
 	bytes := utils.DiagramToBytes(diag)
 	lenBytes := len(bytes)
 	chunksCount := lenBytes / TCP_CHUNK_SIZE + 1
@@ -81,18 +81,17 @@ func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte) 
 		}
 		bytesDiag := utils.DiagramToBytes(mDiag)
 		if callback != nil {
-			length, err := callback(bytesDiag)
-			if err != nil {
-				mLogger.Error("Failed to send packet")
-			} else {
-				mLogger.Trace(
-					"Packet (%d) sent with chunksCount: %v, chunkNo: %v, chunkSize: %v, chunkTotalSize: %v", 
-					length, 
-					mDiag.ChunksCount,
-					mDiag.ChunkNo,
-					mDiag.ChunkSize,
-					mDiag.ChunkTotalSize)
-			}
+			callback(bytesDiag)
+			// if err != nil {
+			// 	mLogger.Error("Failed to send packet")
+			// } else {
+			mLogger.Trace(
+				"Packet (%d) sent with chunksCount: %v, chunkNo: %v, chunkSize: %v, chunkTotalSize: %v", 
+				len(bytesDiag), 
+				mDiag.ChunksCount,
+				mDiag.ChunkNo,
+				mDiag.ChunkSize,
+				mDiag.ChunkTotalSize)
 		}
 	}
 }
@@ -138,7 +137,7 @@ func (ctx *P2PContext) GetDiagram(diagRef interface{}) error {
 			mLogger.Trace("multipart diagram constructed from %v", ctx.Params().GetRemoteAddr().String())
 			return utils.BytesToUDPDiagram(result, diagRef)
 		} else {
-			mLogger.Warn("multipart diagram not ready from %v", ctx.Params().GetRemoteAddr().String())
+			mLogger.Trace("multipart diagram not ready from %v", ctx.Params().GetRemoteAddr().String())
 			return fmt.Errorf("Diagram is multipart, not done yet")
 		}
 	} else {
