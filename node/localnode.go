@@ -1,17 +1,20 @@
 package node
 
 import (
+	"time"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"log"
 	"net"
 
+	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/nat"
 	"github.com/symphonyprotocol/nat/upnp"
 	"github.com/symphonyprotocol/p2p/config"
 	symen "github.com/symphonyprotocol/p2p/encrypt"
 	"github.com/symphonyprotocol/p2p/node/store"
 )
+
+var nodeLogger = log.GetLogger("node")
 
 type Interface interface {
 	GetIDBytes() []byte
@@ -20,6 +23,12 @@ type Interface interface {
 	GetIP() net.IP
 	GetPort() int
 	RefreshNode(ip string, port int)
+}
+
+type ILocalNode interface {
+	Interface
+	GetPrivateKey() *ecdsa.PrivateKey
+	GetLaunchTime()	time.Time
 }
 
 type Node struct {
@@ -68,6 +77,7 @@ type LocalNode struct {
 	Node
 	privKey  *ecdsa.PrivateKey
 	isPublic bool
+	launchTime 	time.Time
 }
 
 func (n *LocalNode) SetRemoteIPPort(ip string, port int) {
@@ -79,20 +89,20 @@ func NewLocalNode() *LocalNode {
 	var privKey *ecdsa.PrivateKey
 	privKeyStr, pubKeyStr := store.GetLocalNodeKeyStr()
 	if len(privKeyStr) == 0 {
-		log.Println("generate key for node")
+		nodeLogger.Info("generate key for node")
 		privKey = symen.GenerateNodeKey()
 		privKeyStr = symen.FromPrivateKey(privKey)
 		pubKeyStr = symen.FromPublicKey(privKey.PublicKey)
 		store.SaveLocalNodeKey(privKeyStr, pubKeyStr)
 	} else {
-		log.Println("load key for node")
+		nodeLogger.Info("load key for node")
 		pubKey := symen.ToPublicKey(pubKeyStr)
 		privKey = symen.ToPrivateKey(privKeyStr, pubKey)
 	}
 	localNode := &LocalNode{}
 	localNode.Node.id = symen.PublicKeyToNodeId(privKey.PublicKey)
 	localNode.Node.network = config.DEFAULT_NET_WORK
-	log.Printf("setup local node: %v", localNode.GetID())
+	nodeLogger.Info("setup local node: %v", localNode.GetID())
 	var ipStr string
 	ipStr, err := nat.GetOutbountIP()
 	if err != nil {
@@ -107,16 +117,17 @@ func NewLocalNode() *LocalNode {
 	ip := net.ParseIP(ipStr)
 	localNode.Node.localIP = ip
 	localNode.Node.localPort = config.DEFAULT_UDP_PORT
-	log.Printf("setup local node ip: %v:%v\n", localNode.localIP, localNode.localPort)
+	nodeLogger.Info("setup local node ip: %v:%v", localNode.localIP, localNode.localPort)
 	localNode.pubKey = privKey.PublicKey
-	log.Printf("setup local node pubkey: %v", pubKeyStr)
+	nodeLogger.Info("setup local node pubkey: %v", pubKeyStr)
 	localNode.privKey = privKey
+	localNode.launchTime = time.Now()
 	return localNode
 }
 func (n *LocalNode) DiscoverNAT() {
 	client, err := upnp.NewUPnPClient()
 	if err != nil {
-		log.Printf("discover upnp error:%v", err)
+		nodeLogger.Info("discover upnp error:%v", err)
 		return
 	}
 	if ok := client.Discover(); ok {
@@ -145,16 +156,16 @@ func (n *LocalNode) DiscoverNAT() {
 				}
 			}
 			if ok := upnp.AddPortMapping(n.localIP.String(), config.DEFAULT_UDP_PORT, mappingPort, "UDP", client); ok {
-				log.Printf("add port mapping for UDP from %v to %v\n", config.DEFAULT_UDP_PORT, mappingPort)
+				nodeLogger.Info("add port mapping for UDP from %v to %v", config.DEFAULT_UDP_PORT, mappingPort)
 			}
 			if ok := upnp.AddPortMapping(n.localIP.String(), config.DEFAULT_TCP_PORT, mappingPort, "TCP", client); ok {
-				log.Printf("add port mapping for TCP from %v to %v\n", config.DEFAULT_TCP_PORT, mappingPort)
+				nodeLogger.Info("add port mapping for TCP from %v to %v", config.DEFAULT_TCP_PORT, mappingPort)
 			}
 		}
 		// get external ip
 		externalIP, err := upnp.GetExternalIPAddress(client)
 		if err != nil {
-			log.Printf("upnp get external ip address error:%v", err)
+			nodeLogger.Info("upnp get external ip address error:%v", err)
 			n.isPublic = false
 		} else {
 			n.isPublic = !nat.IsIntranet(externalIP)
@@ -165,4 +176,12 @@ func (n *LocalNode) DiscoverNAT() {
 			}
 		}
 	}
+}
+
+func (ln *LocalNode) GetPrivateKey() *ecdsa.PrivateKey {
+	return ln.privKey
+}
+
+func (ln *LocalNode) GetLaunchTime() time.Time {
+	return ln.launchTime
 }

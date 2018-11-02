@@ -10,12 +10,25 @@ var (
 		"nodes":
 		[
 			{
-				"id": "6695a9ee2972376eb9d3e7c6a4925aef6b1a4edfc5b9f496c79d11f02ca4901e",
-				"ip":"47.88.227.223",
+				"id": "c4ef0694fee0cdf78eab30c83b325293047e0b27511b92e8e206b199b24f13ea",
+				"ip":"101.200.156.243",
 				"port": 32768
 			}
 		]
 	}`)
+
+// var (
+// 	staticNodeList = []byte(`
+// 	{
+// 		"nodes":
+// 		[
+// 			{
+// 				"id": "e9fa8677cdff28ccc9a0f27d74b032e62deba74c5adc05b394a90182e596726d",
+// 				"ip":"10.106.53.150",
+// 				"port": 32768
+// 			}
+// 		]
+// 	}`)
 
 	DEFAULT_UDP_PORT = 32768
 	DEFAULT_TCP_PORT = 32768

@@ -4,10 +4,12 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"log"
 	"strings"
+	"os/user"
 )
 
 var (
-	LEVEL_DB_FILE = "../config/configdb"
+	CURRENT_USER, _ = user.Current()
+	LEVEL_DB_FILE = CURRENT_USER.HomeDir + "/.symchaindb"
 )
 
 func GetLocalNodeKeyStr() (privKey string, pubKey string) {

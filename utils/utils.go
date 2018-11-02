@@ -5,15 +5,17 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 
 	"github.com/satori/go.uuid"
+	"github.com/symphonyprotocol/log"
 )
+
+var utilsLogger = log.GetLogger("utils")
 
 func ZipDiagramToBytes(diagram interface{}) []byte {
 	data, err := json.Marshal(diagram)
 	if err != nil {
-		log.Fatal(err)
+		utilsLogger.Fatal("%v", err)
 	}
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
@@ -40,14 +42,16 @@ func DiagramToBytes(diagram interface{}) []byte {
 	return b.Bytes()
 }
 
-func BytesToUDPDiagram(data []byte, diagram interface{}) {
+func BytesToUDPDiagram(data []byte, diagram interface{}) error {
 	rdata := bytes.NewReader(data)
 	r, _ := gzip.NewReader(rdata)
 	s, _ := ioutil.ReadAll(r)
 	err := json.Unmarshal(s, &diagram)
 	if err != nil {
-		log.Fatal(err)
+		utilsLogger.Fatal("%v", err)
 	}
+
+	return err
 }
 
 func NewUUID() string {

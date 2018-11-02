@@ -10,10 +10,17 @@ import (
 	"github.com/symphonyprotocol/p2p/kad"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/utils"
+	"github.com/symphonyprotocol/log"
+
+	"flag"
 
 	//"github.com/symphonyprotocol/p2p/udp"
 	//"math/big"
 	"encoding/hex"
+)
+
+var (
+	fDashboard = flag.Bool("dashboard", false, "show dashboard in terminal instead of logs")
 )
 
 func getId() []byte {
@@ -32,9 +39,33 @@ func initialKtable() {
 	fmt.Println(ktable)
 }
 
+func initLogger() {
+	if (*fDashboard) {
+		log.SetGlobalLevel(log.TRACE)
+		log.Configure(map[string]([]log.Appender){
+			"default": []log.Appender{ log.NewFileAppender("./sym.p2p.log", 2000000) },
+		})
+	} else {
+		log.SetGlobalLevel(log.TRACE)
+		log.Configure(map[string]([]log.Appender){
+			"default": []log.Appender{ log.NewConsoleAppender() },
+		})
+	}
+	log.GetDefaultLogger().Info("Hello p2p")
+}
+
 func initialServer() {
 	srv := p2p.NewP2PServer()
+	srv.Use(&p2p.BlockSyncMiddleware{})
+	srv.Use(p2p.NewFileTransferMiddleware())
+	if *fDashboard {
+		// use dashboard
+		srv.Use(&p2p.DashboardMiddleware{})
+	}
 	srv.Start()
+
+	// try to dial to each other
+	
 }
 
 type BaseDiagram struct {
@@ -87,7 +118,8 @@ func testDistance() {
 }
 
 func main() {
-	fmt.Println("hello p2p")
+	flag.Parse()
+	initLogger()
 	initialServer()
 	//testJson()
 	//testDistance()
