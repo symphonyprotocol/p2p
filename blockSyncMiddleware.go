@@ -75,7 +75,7 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 			}
 			ctx.Send(diag)
 		} else {
-			syncLogger.Error("BOOM, the diag we got is not inv diag ??? That's impossible !!!")
+			syncLogger.Trace("BOOM, the diag we got is not inv diag ??? That's impossible !!!")
 		}
 	}
 

@@ -1,7 +1,6 @@
 package udp
 
 import (
-	"fmt"
 	"net"
 	"sync"
 
@@ -53,7 +52,7 @@ func (c *UDPService) loop() {
 		}()
 		n, remoteAddr, err := c.listener.ReadFromUDP(data)
 		if err != nil {
-			fmt.Printf("error during read: %v", err)
+			logger.Error("error during read: %v", err)
 		}
 		rdata := data[:n]
 		var diagram models.UDPDiagram
@@ -76,7 +75,7 @@ func (c *UDPService) Send(ip net.IP, port int, bytes []byte, nodeId string) {
 	//logger.Trace("send udp data to %v", dstAddr)
 	_, err := c.listener.WriteToUDP(bytes, dstAddr)
 	if err != nil {
-		fmt.Printf("send UDP to target %v error:%v", dstAddr, err)
+		logger.Error("send UDP to target %v error:%v", dstAddr, err)
 	}
 }
 

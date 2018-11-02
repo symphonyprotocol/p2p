@@ -1,6 +1,7 @@
 package node
 
 import (
+	"time"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"net"
@@ -27,6 +28,7 @@ type Interface interface {
 type ILocalNode interface {
 	Interface
 	GetPrivateKey() *ecdsa.PrivateKey
+	GetLaunchTime()	time.Time
 }
 
 type Node struct {
@@ -75,6 +77,7 @@ type LocalNode struct {
 	Node
 	privKey  *ecdsa.PrivateKey
 	isPublic bool
+	launchTime 	time.Time
 }
 
 func (n *LocalNode) SetRemoteIPPort(ip string, port int) {
@@ -118,6 +121,7 @@ func NewLocalNode() *LocalNode {
 	localNode.pubKey = privKey.PublicKey
 	nodeLogger.Info("setup local node pubkey: %v", pubKeyStr)
 	localNode.privKey = privKey
+	localNode.launchTime = time.Now()
 	return localNode
 }
 func (n *LocalNode) DiscoverNAT() {
@@ -176,4 +180,8 @@ func (n *LocalNode) DiscoverNAT() {
 
 func (ln *LocalNode) GetPrivateKey() *ecdsa.PrivateKey {
 	return ln.privKey
+}
+
+func (ln *LocalNode) GetLaunchTime() time.Time {
+	return ln.launchTime
 }

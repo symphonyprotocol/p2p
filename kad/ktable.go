@@ -19,7 +19,7 @@ import (
 var (
 	//BUCKETS_TOTAL = 256
 	BUCKETS_SIZE = 8
-	logger = log.GetLogger("ktable")
+	logger = log.GetLogger("ktable").SetLevel(log.INFO)
 	pingTime 			sync.Map
 	pingExpectedNodeIds	sync.Map
 )
@@ -345,7 +345,7 @@ func (t *KTable) callback(p models.ICallbackParams) {
 		if params.Diagram.GetDType() == KTABLE_DIAGRAM_PONG {
 			if lastTime, ok := pingTime.Load(params.Diagram.GetID()); ok {
 				latency = int(time.Since(lastTime.(time.Time)) / time.Millisecond)
-				logger.Info("recieve pong from %v, %v:%v - latency: %vms", params.GetUDPDiagram().GetNodeID(), params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
+				logger.Debug("recieve pong from %v, %v:%v - latency: %vms", params.GetUDPDiagram().GetNodeID(), params.GetUDPRemoteAddr().IP.String(), params.GetUDPRemoteAddr().Port, latency)
 				pingTime.Delete(params.Diagram.GetID())
 			}
 

@@ -9,7 +9,7 @@ import (
 	"github.com/symphonyprotocol/p2p/models"
 )
 
-var mLogger = log.GetLogger("middleware")
+var mLogger = log.GetLogger("middleware").SetLevel(log.INFO)
 var TCP_CHUNK_SIZE = 500
 var multipartDiagramMap sync.Map
 var _multipartDiagramPartsMap sync.Map

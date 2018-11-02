@@ -48,7 +48,7 @@ func initLogger() {
 	} else {
 		log.SetGlobalLevel(log.TRACE)
 		log.Configure(map[string]([]log.Appender){
-			"default": []log.Appender{ &log.ConsoleAppender{} },
+			"default": []log.Appender{ log.NewConsoleAppender() },
 		})
 	}
 	log.GetDefaultLogger().Info("Hello p2p")
