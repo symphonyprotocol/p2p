@@ -47,12 +47,20 @@ func (ctx *P2PContext) NewTCPDiagram() models.TCPDiagram {
 }
 
 func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
+	ctx.BroadcastWithFilter(diag, func(p *node.RemoteNode) bool { return true })
+}
+
+func (ctx *P2PContext) BroadcastWithFilter(diag models.IDiagram, filter func(_p *node.RemoteNode) bool) {
 	peers := ctx._nodeProvider.PeekNodes()
 	for _, peer := range peers {
-		mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
-		ctx.chunkDiagram(diag, func(bytes []byte) {
-			ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
-		})
+		if filter(peer) {
+			mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
+			ctx.chunkDiagram(diag, func(bytes []byte) {
+				ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
+			})
+		} else {
+			mLogger.Trace("Node %v filtered to be excluded when broadcasting", peer.GetID())
+		}
 	}
 }
 
