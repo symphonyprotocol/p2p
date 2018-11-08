@@ -69,8 +69,8 @@ type TCPDiagram struct {
 	NetworkDiagram
 }
 
-func NewTCPDiagram() TCPDiagram {
-	return TCPDiagram{
+func NewTCPDiagram() *TCPDiagram {
+	return &TCPDiagram{
 		NetworkDiagram{
 			ID: utils.NewUUID(),
 			DCategory: "default",

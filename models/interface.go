@@ -30,6 +30,9 @@ type INetwork interface {
 
 type INodeProvider interface {
 	PeekNodes() []*node.RemoteNode
+
+	// Get nodes by distance limited with <param>max</param>
+	GetNearbyNodes(max int) []*node.RemoteNode
 	GetLocalNode() *node.LocalNode 
 	Start()
 }

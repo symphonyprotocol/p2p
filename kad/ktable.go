@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"sort"
 
 	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/models"
@@ -96,6 +97,20 @@ func (t *KTable) PeekNodes() []*node.RemoteNode {
 		}
 	}
 	return remotes
+}
+
+func (t *KTable) GetNearbyNodes(max int) []*node.RemoteNode {
+	nodes := t.PeekNodes()
+	localIDBytes := t.localNode.GetIDBytes()
+	sort.Slice(nodes[:], func (i, j int) bool {
+		return distance(localIDBytes, nodes[i].GetIDBytes()) < distance(localIDBytes, nodes[j].GetIDBytes())
+	})
+
+	if max > len(nodes) {
+		return nodes[:]
+	} else {
+		return nodes[:max-1]
+	}
 }
 
 func (t *KTable) GetLocalNode() *node.LocalNode {

@@ -19,7 +19,7 @@ func newFileSyncDiagram(ln *node.LocalNode) fileSyncDiagram {
 	diagram.NodeID = ln.GetID()
 	diagram.Timestamp = time.Now().Unix()
 	return fileSyncDiagram{
-		diagram,
+		*diagram,
 	}
 }
 

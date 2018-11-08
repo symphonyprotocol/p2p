@@ -40,7 +40,7 @@ func (ctx *P2PContext) Send(diag models.IDiagram) {
 	})
 }
 
-func (ctx *P2PContext) NewTCPDiagram() models.TCPDiagram {
+func (ctx *P2PContext) NewTCPDiagram() *models.TCPDiagram {
 	tDiag := models.NewTCPDiagram()
 	tDiag.NodeID = ctx.LocalNode().GetID()
 	return tDiag
@@ -80,7 +80,7 @@ func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte))
 			end = lenBytes
 		}
 		mDiag := MultipartTCPDiagram{
-			TCPDiagram: tDiag,
+			TCPDiagram: *tDiag,
 			ChunksCount: chunksCount,
 			ChunkNo: i,
 			RawData: bytes[i * TCP_CHUNK_SIZE: end],
@@ -224,3 +224,40 @@ type IMiddleware interface {
 	DropConnection(*TCPConnection)
 	Name() string
 }
+
+type BaseMiddleware struct {
+	reqHandlers map[string]func(*P2PContext)
+}
+
+func NewBaseMiddleware() *BaseMiddleware {
+	return &BaseMiddleware{
+		reqHandlers: make(map[string]func(*P2PContext)),
+	}
+}
+
+func (b *BaseMiddleware) Handle(ctx *P2PContext) {
+	diag := ctx.Params().GetDiagram()
+	dType := diag.GetDType()
+	if handler, ok := b.reqHandlers[dType]; ok {
+		handler(ctx)
+	}
+
+	ctx.Next()
+}
+
+func (b *BaseMiddleware) HandleRequest(reqPath string, handler func (*P2PContext)) {
+	b.reqHandlers[reqPath] = handler
+}
+
+func (b *BaseMiddleware) Start(*P2PContext) {}
+func (b *BaseMiddleware) AcceptConnection(*TCPConnection) {}
+func (b *BaseMiddleware) DropConnection(*TCPConnection) {}
+
+func (b *BaseMiddleware) Name() string {
+	return "BaseMiddleware"
+}
+
+func (b *BaseMiddleware) DashboardData() interface{} { return nil }
+func (b *BaseMiddleware) DashboardType() string { return "" }
+func (b *BaseMiddleware) DashboardTitle() string { return "" }
+func (b *BaseMiddleware) DashboardTableHasColumnTitles() bool { return false }

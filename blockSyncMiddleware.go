@@ -39,7 +39,7 @@ func (b *BlockSyncMiddleware) Start(p *tcp.P2PContext) {
 			tDiag.NodeID = p.LocalNode().GetID()
 			tDiag.DType = "/inv"
 			p.Broadcast(InvDiagram{
-				TCPDiagram: tDiag,
+				TCPDiagram: *tDiag,
 				MyBlockHeight: BlockHeight,
 			})
 		}
@@ -70,7 +70,7 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 			tDiag.NodeID = ctx.LocalNode().GetID()
 			tDiag.DType = "/inv_res"
 			diag := InvDiagram{
-				TCPDiagram: tDiag,
+				TCPDiagram: *tDiag,
 				MyBlockHeight: BlockHeight,
 			}
 			ctx.Send(diag)
@@ -91,7 +91,7 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 				tDiag.NodeID = ctx.LocalNode().GetID()
 				tDiag.DType = "/getblock"
 				diag := GetBlockDiagram{
-					TCPDiagram: tDiag,
+					TCPDiagram: *tDiag,
 					TargetBlockHeight: invDiag.MyBlockHeight,
 					CurrentBlockHeight: BlockHeight,
 				}
@@ -110,7 +110,7 @@ func (b *BlockSyncMiddleware) Handle(ctx *tcp.P2PContext) {
 			tDiag.NodeID = ctx.LocalNode().GetID()
 			tDiag.DType = "/getblock_res"
 			diag := GetBlockDiagram{
-				TCPDiagram: tDiag,
+				TCPDiagram: *tDiag,
 				TargetBlockHeight: BlockHeight,
 				CurrentBlockHeight: BlockHeight,
 			}
