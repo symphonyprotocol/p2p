@@ -59,7 +59,7 @@ func NewTCPConnection(conn net.Conn, isInbound bool) *TCPConnection {
 		isInbound: isInbound,
 		stop:      make(chan struct{}),
 		lastActiveTime:	time.Now(),
-		writeQueue: make(chan []byte),
+		writeQueue: make(chan []byte, 100),
 	}
 }
 

@@ -90,7 +90,7 @@ func (d *FileTransferMiddleware) Start(ctx *tcp.P2PContext) {
 			h.Write(bytes)
 			hash := h.Sum(nil)
 			d.bytesSent.Add(d.bytesSent, big.NewInt(int64(len(bytes))))
-			ctx.Broadcast(FileDiagram{
+			ctx.Broadcast(&FileDiagram{
 				TCPDiagram: *tDiag,
 				Bytes: bytes,
 				FileHash: fmt.Sprintf("%x", hash),

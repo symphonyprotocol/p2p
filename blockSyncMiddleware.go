@@ -38,7 +38,7 @@ func (b *BlockSyncMiddleware) Start(p *tcp.P2PContext) {
 			tDiag := models.NewTCPDiagram()
 			tDiag.NodeID = p.LocalNode().GetID()
 			tDiag.DType = "/inv"
-			p.Broadcast(InvDiagram{
+			p.Broadcast(&InvDiagram{
 				TCPDiagram: *tDiag,
 				MyBlockHeight: BlockHeight,
 			})

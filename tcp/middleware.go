@@ -7,12 +7,14 @@ import (
 	"github.com/symphonyprotocol/log"
 	"github.com/symphonyprotocol/p2p/node"
 	"github.com/symphonyprotocol/p2p/models"
+	"time"
 )
 
 var mLogger = log.GetLogger("middleware").SetLevel(log.INFO)
 var TCP_CHUNK_SIZE = 500
 var multipartDiagramMap sync.Map
 var _multipartDiagramPartsMap sync.Map
+var msgBroadcasted sync.Map
 
 type P2PContext struct {
 	_skipped    bool
@@ -51,10 +53,30 @@ func (ctx *P2PContext) Broadcast(diag models.IDiagram) {
 }
 
 func (ctx *P2PContext) BroadcastWithFilter(diag models.IDiagram, filter func(_p *node.RemoteNode) bool) {
-	peers := ctx._nodeProvider.PeekNodes()
+	ctx.BroadcastToPeers(diag, ctx._nodeProvider.PeekNodes(), filter)
+}
+
+func (ctx *P2PContext) BroadcastToNearbyNodes(diag models.IDiagram, maxNodeCount int, filter func (_p *node.RemoteNode) bool) {
+	ctx.BroadcastToPeers(diag, ctx._nodeProvider.GetNearbyNodes(maxNodeCount), filter)
+}
+
+func (ctx *P2PContext) BroadcastToPeers(diag models.IDiagram, peers []*node.RemoteNode, filter func(_p *node.RemoteNode) bool) {
+	if _msg, _ok := msgBroadcasted.Load(diag.GetID()); _ok {
+		if ts, ok := _msg.(time.Time); ok {
+			if time.Since(ts) < time.Hour {
+				mLogger.Trace("This msg was broadcasted in an hour and we will not broadcast it again.")
+				return 
+			} else {
+				mLogger.Warn("Try to broadcast it again after an hour, this should not happend so much.")
+				msgBroadcasted.Delete(diag.GetID())
+			}
+		}
+	}
+
 	for _, peer := range peers {
-		if filter(peer) {
+		if filter == nil || filter(peer) {
 			mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
+			msgBroadcasted.Store(diag.GetID(), time.Now())
 			ctx.chunkDiagram(diag, func(bytes []byte) {
 				ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
 			})
@@ -79,7 +101,7 @@ func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte))
 		if end > lenBytes {
 			end = lenBytes
 		}
-		mDiag := MultipartTCPDiagram{
+		mDiag := &MultipartTCPDiagram{
 			TCPDiagram: *tDiag,
 			ChunksCount: chunksCount,
 			ChunkNo: i,
