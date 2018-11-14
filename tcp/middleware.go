@@ -77,13 +77,17 @@ func (ctx *P2PContext) BroadcastToPeers(diag models.IDiagram, peers []*node.Remo
 		if filter == nil || filter(peer) {
 			mLogger.Trace("Broadcasting message %v to peer %v (%v:%v)", diag.GetID(), peer.GetID(), peer.GetRemoteIP().String(), peer.GetRemotePort())
 			msgBroadcasted.Store(diag.GetID(), time.Now())
-			ctx.chunkDiagram(diag, func(bytes []byte) {
-				ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
-			})
+			ctx.SendToPeer(diag, peer)
 		} else {
 			mLogger.Trace("Node %v filtered to be excluded when broadcasting", peer.GetID())
 		}
 	}
+}
+
+func (ctx *P2PContext) SendToPeer(diag models.IDiagram, peer *node.RemoteNode) {
+	ctx.chunkDiagram(diag, func(bytes []byte) {
+		ctx._network.Send(peer.GetRemoteIP(), peer.GetRemotePort(), bytes, peer.GetID())
+	})
 }
 
 func (ctx *P2PContext) chunkDiagram(diag models.IDiagram, callback func([]byte)) {
@@ -249,6 +253,7 @@ type IMiddleware interface {
 
 type BaseMiddleware struct {
 	reqHandlers map[string]func(*P2PContext)
+	startCtx	*P2PContext
 }
 
 func NewBaseMiddleware() *BaseMiddleware {
@@ -271,7 +276,7 @@ func (b *BaseMiddleware) HandleRequest(reqPath string, handler func (*P2PContext
 	b.reqHandlers[reqPath] = handler
 }
 
-func (b *BaseMiddleware) Start(*P2PContext) {}
+func (b *BaseMiddleware) Start(ctx *P2PContext) { b.startCtx = ctx }
 func (b *BaseMiddleware) AcceptConnection(*TCPConnection) {}
 func (b *BaseMiddleware) DropConnection(*TCPConnection) {}
 
