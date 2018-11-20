@@ -97,7 +97,8 @@ func (s *P2PServer) Use(m tcp.IMiddleware) {
 }
 
 // NodeID will be set by P2PServer
-func (s *P2PServer) Broadcast(diagram models.TCPDiagram) {
+func (s *P2PServer) NewP2PContext() *tcp.P2PContext {
+	return tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil, s.middlewares)
 }
 
 func (s *P2PServer) Close() {
