@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var tcpLogger = log.GetLogger("tcp").SetLevel(log.INFO)
+var tcpLogger = log.GetLogger("tcp").SetLevel(log.TRACE)
 
 type TCPConnection struct {
 	net.Conn
