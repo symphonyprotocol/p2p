@@ -21,6 +21,7 @@ type P2PServer struct {
 	syncManager *tcp.SyncManager
 	middlewares []tcp.IMiddleware
 	quit        chan int
+	p2pContext	*tcp.P2PContext
 }
 
 func NewP2PServer() *P2PServer {
@@ -48,6 +49,7 @@ func (s *P2PServer) Start() {
 	s.tcpService.Start()
 	s.regTCPEvents()
 	s.ktable.Start()
+	s.p2pContext = tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil, s.middlewares)
 	s.startMiddlewares()
 	// s.syncManager.Start()
 	defer close(s.quit)
@@ -85,9 +87,8 @@ func (s *P2PServer) regTCPEvents() {
 }
 
 func (s *P2PServer) startMiddlewares() {
-	ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil, s.middlewares)
 	for _, middleware := range s.middlewares {
-		middleware.Start(ctx)
+		middleware.Start(s.p2pContext)
 	}
 }
 
@@ -99,6 +100,10 @@ func (s *P2PServer) Use(m tcp.IMiddleware) {
 // NodeID will be set by P2PServer
 func (s *P2PServer) NewP2PContext() *tcp.P2PContext {
 	return tcp.NewP2PContext(s.tcpService, s.node, s.ktable, nil, s.middlewares)
+}
+
+func (s *P2PServer) GetP2PContext() *tcp.P2PContext {
+	return s.p2pContext
 }
 
 func (s *P2PServer) Close() {

@@ -169,7 +169,12 @@ func (ctx *P2PContext) GetDiagram(diagRef interface{}) error {
 		result := ctx.ResolveMultipartDiagram(mDiag)
 		if result != nil {
 			mLogger.Trace("multipart diagram constructed from %v", ctx.Params().GetRemoteAddr().String())
-			return utils.BytesToUDPDiagram(result, diagRef)
+			_err := utils.BytesToUDPDiagram(result, diagRef)
+			if _, _ok := msgBroadcasted.Load(mDiag.GetID()); _ok {
+				mLogger.Warn("Got a message that was broadcasted by me ! drop it")
+				return fmt.Errorf("This message is broadcasted by me !!!, DROP IT")
+			}
+			return _err
 		} else {
 			mLogger.Trace("multipart diagram not ready from %v", ctx.Params().GetRemoteAddr().String())
 			return fmt.Errorf("Diagram is multipart, not done yet")
