@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"os/user"
+	"io/ioutil"
 )
 
 var (
@@ -33,6 +35,10 @@ var (
 	DEFAULT_UDP_PORT = 32768
 	DEFAULT_TCP_PORT = 32768
 	DEFAULT_NET_WORK = "MINOR"
+	
+	CURRENT_USER, _ = user.Current()
+	LEVEL_DB_FILE = CURRENT_USER.HomeDir + "/.symchaindb"
+	CONFIG_FILE = CURRENT_USER.HomeDir + "/.symchaincfg"
 )
 
 type StaticNodes struct {
@@ -48,7 +54,12 @@ type StaticNode struct {
 
 func LoadStaticNodes() StaticNodes {
 	var nodes StaticNodes
-	err := json.Unmarshal(staticNodeList, &nodes)
+	nodeList, err := ioutil.ReadFile(CONFIG_FILE)
+	if err != nil {
+		err = json.Unmarshal(staticNodeList, &nodes)
+	} else {
+		err = json.Unmarshal(nodeList, &nodes)
+	}
 	if err != nil {
 		panic(err)
 	}

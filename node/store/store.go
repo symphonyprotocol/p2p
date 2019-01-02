@@ -2,14 +2,9 @@ package store
 
 import (
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/symphonyprotocol/p2p/config"
 	"log"
 	"strings"
-	"os/user"
-)
-
-var (
-	CURRENT_USER, _ = user.Current()
-	LEVEL_DB_FILE = CURRENT_USER.HomeDir + "/.symchaindb"
 )
 
 func GetLocalNodeKeyStr() (privKey string, pubKey string) {
@@ -31,7 +26,7 @@ func SaveLocalNodeKey(privKey string, pubKey string) error {
 }
 
 func getData(key string) ([]byte, error) {
-	db, err := leveldb.OpenFile(LEVEL_DB_FILE, nil)
+	db, err := leveldb.OpenFile(config.LEVEL_DB_FILE, nil)
 	if err != nil {
 		log.Fatalf("cannot open leveldb:", err)
 	}
@@ -45,7 +40,7 @@ func getData(key string) ([]byte, error) {
 }
 
 func saveData(key string, value []byte) error {
-	db, err := leveldb.OpenFile(LEVEL_DB_FILE, nil)
+	db, err := leveldb.OpenFile(config.LEVEL_DB_FILE, nil)
 	if err != nil {
 		log.Fatalf("cannot open leveldb:", err)
 	}
