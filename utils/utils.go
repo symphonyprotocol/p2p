@@ -5,12 +5,14 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io/ioutil"
+	"sync"
 
 	"github.com/satori/go.uuid"
 	"github.com/symphonyprotocol/log"
 )
 
 var utilsLogger = log.GetLogger("utils")
+var _mtx sync.RWMutex
 
 func ZipDiagramToBytes(diagram interface{}) []byte {
 	data, err := json.Marshal(diagram)
@@ -43,6 +45,8 @@ func DiagramToBytes(diagram interface{}) []byte {
 }
 
 func BytesToUDPDiagram(data []byte, diagram interface{}) error {
+	_mtx.Lock()
+	defer _mtx.Unlock()
 	rdata := bytes.NewReader(data)
 	r, _ := gzip.NewReader(rdata)
 	s, _ := ioutil.ReadAll(r)
