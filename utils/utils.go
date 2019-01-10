@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
@@ -45,12 +46,20 @@ func DiagramToBytes(diagram interface{}) []byte {
 }
 
 func BytesToUDPDiagram(data []byte, diagram interface{}) error {
-	_mtx.Lock()
-	defer _mtx.Unlock()
+	if data == nil || len(data) == 0 {
+		return fmt.Errorf("Nil/Empty data (%v) cannot be converted to Diagram", data)
+	}
+
 	rdata := bytes.NewReader(data)
-	r, _ := gzip.NewReader(rdata)
-	s, _ := ioutil.ReadAll(r)
-	err := json.Unmarshal(s, &diagram)
+	r, err := gzip.NewReader(rdata)
+	if err != nil {
+		return err
+	}
+	s, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(s, &diagram)
 	if err != nil {
 		utilsLogger.Fatal("%v", err)
 	}
