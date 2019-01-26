@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"reflect"
 	"fmt"
 	"sync"
 	"github.com/symphonyprotocol/p2p/utils"
@@ -168,7 +169,11 @@ func (ctx *P2PContext) GetDiagram(diagRef interface{}) error {
 		mLogger.Trace("I got a multipart diagram from %v", ctx.Params().GetRemoteAddr().String())
 		result := ctx.ResolveMultipartDiagram(mDiag)
 		if result != nil {
-			mLogger.Trace("multipart diagram constructed from %v", ctx.Params().GetRemoteAddr().String())
+			mLogger.Trace("multipart diagram constructed from %v, going to convert it \n%v \nto diagram: %v", 
+				ctx.Params().GetRemoteAddr().String(),
+				result,
+				reflect.TypeOf(diagRef).Elem(),
+			)
 			_err := utils.BytesToUDPDiagram(result, diagRef)
 			if _, _ok := msgBroadcasted.Load(mDiag.GetID()); _ok {
 				mLogger.Warn("Got a message that was broadcasted by me ! drop it")
@@ -259,11 +264,13 @@ type IMiddleware interface {
 type BaseMiddleware struct {
 	reqHandlers map[string]func(*P2PContext)
 	startCtx	*P2PContext
+	workChan	chan *P2PContext
 }
 
 func NewBaseMiddleware() *BaseMiddleware {
 	return &BaseMiddleware{
 		reqHandlers: make(map[string]func(*P2PContext)),
+		workChan: make(chan *P2PContext),
 	}
 }
 
@@ -281,7 +288,10 @@ func (b *BaseMiddleware) HandleRequest(reqPath string, handler func (*P2PContext
 	b.reqHandlers[reqPath] = handler
 }
 
-func (b *BaseMiddleware) Start(ctx *P2PContext) { b.startCtx = ctx }
+func (b *BaseMiddleware) Start(ctx *P2PContext) { 
+	b.startCtx = ctx 
+	// go b.HandleWorkLoop()
+}
 func (b *BaseMiddleware) AcceptConnection(*TCPConnection) {}
 func (b *BaseMiddleware) DropConnection(*TCPConnection) {}
 

@@ -62,14 +62,16 @@ func (s *P2PServer) regTCPEvents() {
 			ctx := tcp.NewP2PContext(s.tcpService, s.node, s.ktable, &params, s.middlewares)
 			
 			// p2pLogger.Debug("Length of middlewares is %v", len(s.middlewares))
-			for _, middleware := range s.middlewares {
-				middleware.Handle(ctx)
-				if ctx.GetSkipped() {
-					ctx.ResetSkipped()
-				} else {
-					break
+			go func() {
+				for _, middleware := range s.middlewares {
+					middleware.Handle(ctx)
+					if ctx.GetSkipped() {
+						ctx.ResetSkipped()
+					} else {
+						break
+					}
 				}
-			}
+			}()
 		}
 	})
 

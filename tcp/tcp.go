@@ -142,21 +142,10 @@ func (tcp *TCPService) loop() {
 }
 
 func (tcp *TCPService) handleSendEvent(conn *TCPConnection, key string) {
-
+LOOP_CONN_SEND:
 	for {
-		quit := false
 		select {
 		case <-conn.stop:
-			quit = true
-		case bytes := <-conn.writeQueue:
-			tcpLogger.Trace("conn - going to write")
-			_, err := conn.Write(bytes)
-			if err != nil {
-				tcpLogger.Error("conn: write: %s", err)
-			}
-		}
-
-		if quit {
 			tcpLogger.Trace("TCP Connection to %v quit by signal", conn.RemoteAddr().String())
 			// 2. close this connection
 			conn.Close()
@@ -165,7 +154,13 @@ func (tcp *TCPService) handleSendEvent(conn *TCPConnection, key string) {
 			}
 			// 3. remove from map
 			tcp.connections.Delete(key)
-			break
+			break LOOP_CONN_SEND
+		case bytes := <-conn.writeQueue:
+			tcpLogger.Trace("conn - going to write")
+			_, err := conn.Write(bytes)
+			if err != nil {
+				tcpLogger.Error("conn: write: %s", err)
+			}
 		}
 	}
 }
