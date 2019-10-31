@@ -54,3 +54,6 @@ func main() {
     server.Use(&SimpleMiddleware{})
 }
 ```
+## Module Support
+
+* In progress
